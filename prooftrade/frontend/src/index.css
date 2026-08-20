@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/* Explicit scan roots (additive to Tailwind v4 auto-detection). */
+@source "./";
+@source "../index.html";
+
+/* ---------------------------------------------------------------------------
+   ProofTrade design tokens.
+   Dense, dark, professional financial UI. Everything here lands in :root as a
+   CSS custom property AND generates Tailwind utilities, so feature components
+   can use either `text-muted` / `bg-panel` or `var(--color-muted)`.
+
+   `static` keeps every token in the output even when no utility references it
+   yet -- Recharts takes colors as prop strings (stroke="var(--color-positive)"),
+   which Tailwind's usage detection cannot see.
+--------------------------------------------------------------------------- */
+@theme static {
+  /* Surfaces */
+  --color-bg: #080b11;          /* page background, near-black slate */
+  --color-panel: #0f141c;       /* card / panel background */
+  --color-panel-hi: #161d28;    /* hovered or raised panel */
+  --color-border: #1e2733;      /* hairline dividers and panel edges */
+
+  /* Text */
+  --color-primary: #e6edf5;     /* primary text */
+  --color-muted: #7d8a9c;       /* labels, secondary text, axis ticks */
+
+  /* Semantics */
+  --color-accent: #22d3ee;      /* confident cyan */
+  --color-accent-dim: #0e7490;  /* accent at rest / chart fills */
+  --color-positive: #2ebd85;    /* gains */
+  --color-negative: #f6465d;    /* losses */
+  --color-warning: #f5a524;     /* caveats, low-evidence flags */
+
+  /* Type */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo",
+    "Consolas", monospace;
+}
+
+:root {
+  --radius-panel: 0.625rem;
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.4);
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-bg);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-bg);
+    color: var(--color-primary);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    /* Numbers line up in columns across tables and charts. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings opt out of tabular figures; proportional reads better in prose. */
+  h1, h2, h3, h4 {
+    font-variant-numeric: normal;
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Standard container for every metric card, table and chart block. */
+  .panel {
+    background-color: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* Numeric cells: fixed-width digits that never jitter as values update. */
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "zero" 1;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Thin scrollbars so dense tables keep their pixels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-panel-hi);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
