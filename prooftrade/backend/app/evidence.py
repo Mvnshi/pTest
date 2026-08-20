@@ -475,7 +475,7 @@ def build_evidence(
     )
     weakest = min(components, key=lambda c: c.score)
     evidence.headline = (
-        f"Grade {evidence.grade} - {evidence.score:.0f}/100. "
+        f"Grade {evidence.grade} - {evidence.score:.1f}/100. "
         f"Weakest evidence: {weakest.label.lower()} ({weakest.measurement}). "
         "This scores how much the backtest can be trusted, not how much money the "
         "strategy will make."

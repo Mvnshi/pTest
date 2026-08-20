@@ -142,6 +142,10 @@ Conventions with more than one accepted definition, stated because the choice mo
 - **Exposure is average gross exposure, not the fraction of days invested.** A strategy holding one
   of five slots reads 0.2, the same as one fully invested on a fifth of days. They are different
   things and the difference matters for the Sharpe argument below.
+- **Per-symbol P&L share** uses gross profit as its denominator — the sum of the positive
+  per-symbol net P&L totals — which is the same denominator the concentration block uses, so the
+  two figures agree on screen. Positive shares sum to 100%; a losing symbol reports a negative
+  share, meaning it gave back that fraction of what the winners made.
 - All trades are closed by construction — anything still open on the final bar is liquidated at that
   close — so trade statistics contain no open-position P&L.
 - **Metrics for a sub-period** (a year, a regime, an IS/OOS half) are computed on the equity slice for

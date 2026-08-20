@@ -169,7 +169,10 @@ class SymbolStat:
     symbol: str
     trades: int
     net_pnl: float
-    pnl_share_pct: float          # share of total net profit (of the profitable total)
+    # Share of GROSS PROFIT - the same denominator the concentration block uses, so the
+    # two numbers on screen agree. Losing symbols report a negative share, meaning they
+    # gave back that fraction of what the winners made.
+    pnl_share_pct: float
     win_rate_pct: float
     avg_return_pct: float
     total_return_pct: float       # sum of trade returns, a rough contribution proxy
@@ -181,7 +184,9 @@ def per_symbol(trades: list[Trade], universe: list[str]) -> list[SymbolStat]:
     buckets: dict[str, list[Trade]] = defaultdict(list)
     for t in trades:
         buckets[t.symbol].append(t)
-    total_abs = sum(abs(t.net_pnl) for t in trades) or 1.0
+    gross_profit = sum(
+        pnl for pnl in (sum(t.net_pnl for t in group) for group in buckets.values()) if pnl > 0
+    ) or 1.0
     out: list[SymbolStat] = []
     for symbol in sorted(universe):
         group = buckets.get(symbol, [])
@@ -194,7 +199,7 @@ def per_symbol(trades: list[Trade], universe: list[str]) -> list[SymbolStat]:
             symbol=symbol,
             trades=len(group),
             net_pnl=round(float(pnl.sum()), 2),
-            pnl_share_pct=round(float(pnl.sum()) / total_abs * 100.0, 2),
+            pnl_share_pct=round(float(pnl.sum()) / gross_profit * 100.0, 2),
             win_rate_pct=round(float((pnl > 0).mean()) * 100.0, 2),
             avg_return_pct=round(float(rets.mean()), 4),
             total_return_pct=round(float(rets.sum()), 4),
