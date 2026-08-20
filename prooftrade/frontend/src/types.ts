@@ -310,6 +310,14 @@ export interface CostSensitivity {
   /** Round-trip cost at which CAGR turns negative. Null when none in range. */
   breakeven_round_trip_bps: number | null
   survives_5x: boolean
+  /**
+   * False when a higher cost level produced a HIGHER return somewhere in the sweep.
+   * Stops and targets are anchored to the slipped fill, so changing the cost level
+   * moves those levels and a different set of trades is stopped out. When this is
+   * false, `note` explains it and the curve should be read as five separate
+   * backtests rather than one strategy being taxed.
+   */
+  monotonic: boolean
   note: string
 }
 
@@ -386,7 +394,14 @@ export interface Evidence {
 --------------------------------------------------------------------------- */
 
 export interface Diagnostics {
+  /** Entry signals dropped because every position slot was already full. */
   skipped_entry_signals: number
+  /** Entry signals dropped because the slot could not buy one whole share. */
+  unaffordable_entry_signals: number
+  /** True when equity reached zero and the run stopped there. */
+  account_ruined: boolean
+  /** Date equity reached zero; empty string when the account survived. */
+  ruin_date: string
   warmup_bars: number
   universe_size: number
   bars_evaluated: number

@@ -70,12 +70,18 @@ def test_walk_forward_folds_start_flat(setup):
     assert total_fold_trades <= len(base.trades) + len(wf.folds)
 
 
-def test_cost_sensitivity_is_monotonic_and_finds_a_breakeven(setup):
+def test_cost_sensitivity_sweeps_every_level_and_finds_a_breakeven(setup):
     store, strategy, config, base = setup
     cs = cost_sensitivity(strategy, config, store, base)
     assert [p["multiple"] for p in cs.points] == list(COST_MULTIPLES)
     cagrs = [p["cagr_pct"] for p in cs.points]
-    assert cagrs == sorted(cagrs, reverse=True), "more cost cannot mean more return"
+    # Strict monotonicity is NOT an invariant: stops and targets are anchored to the
+    # slipped fill, so a cost change moves those levels and a different set of trades
+    # is stopped out. What must hold is that the sweep reports whether it happened.
+    assert cs.monotonic == (cagrs == sorted(cagrs, reverse=True))
+    if not cs.monotonic:
+        assert "not monotonic" in cs.note
+    assert cagrs[-1] <= cagrs[0], "5x costs must not beat zero costs overall"
     if cs.breakeven_round_trip_bps is not None:
         assert cs.breakeven_round_trip_bps >= 0
     assert cs.survives_5x == (cagrs[-1] > 0)

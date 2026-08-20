@@ -233,8 +233,36 @@ def _warnings(
     is_synthetic: bool,
     benchmark: Metrics,
     skipped_signals: int,
+    unaffordable_signals: int,
+    ruined: bool,
+    ruin_date: str,
 ) -> list[Warning_]:
     out: list[Warning_] = []
+
+    if ruined:
+        out.append(Warning_(
+            id="account_ruined",
+            severity="critical",
+            title="The account was wiped out",
+            message=("Equity reached zero and the backtest stopped there. Every figure "
+                     "on this page describes the run up to that point and nothing after "
+                     "it. Short positions carry no margin or borrow model here, so a "
+                     "squeeze is unbounded in a way a real broker would have ended sooner."),
+            measurement=f"equity reached zero on {ruin_date}",
+            threshold="equity <= 0",
+        ))
+    if unaffordable_signals > 0:
+        out.append(Warning_(
+            id="unaffordable_entries",
+            severity="medium" if unaffordable_signals > max(10, 0.1 * metrics.trades) else "info",
+            title="Some entries could not afford a single share",
+            message=("The per-position budget was smaller than one share of those "
+                     "symbols, so the rule quietly skipped them. The universe you "
+                     "actually tested was narrower than the one you chose. Raise the "
+                     "starting capital or lower the position count."),
+            measurement=f"{unaffordable_signals} entry signals dropped for affordability",
+            threshold="more than zero",
+        ))
 
     # --- required: low trade count --------------------------------------------------
     if metrics.trades < 30:
@@ -452,6 +480,9 @@ def build_evidence(
     years_covered: int,
     benchmark: Metrics,
     skipped_signals: int = 0,
+    unaffordable_signals: int = 0,
+    ruined: bool = False,
+    ruin_date: str = "",
     is_synthetic: bool = False,
 ) -> Evidence:
     components = [
@@ -470,7 +501,7 @@ def build_evidence(
                     for c in components],
         warnings=[asdict(w) for w in _warnings(
             metrics, conc, split, costs, robust, regimes, years_covered, is_synthetic,
-            benchmark, skipped_signals,
+            benchmark, skipped_signals, unaffordable_signals, ruined, ruin_date,
         )],
     )
     weakest = min(components, key=lambda c: c.score)

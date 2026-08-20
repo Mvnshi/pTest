@@ -156,6 +156,7 @@ class CostSensitivity:
     sharpe_retained_at_3x: float | None = None
     breakeven_round_trip_bps: float | None = None
     survives_5x: bool = False
+    monotonic: bool = True
     note: str = ""
 
 
@@ -184,15 +185,31 @@ def cost_sensitivity(
         ))
     out.points = [_as_dict(p) for p in measured]
 
+    # Costs do not always hurt monotonically. Stop and target levels are anchored to
+    # the slipped fill, so raising costs moves those levels, which changes which trades
+    # are stopped out and can leave the path better off. That is a real property of a
+    # fill-anchored risk model, not a numerical artefact, and it is reported rather
+    # than smoothed away.
+    cagr_series = [p.cagr_pct for p in measured]
+    out.monotonic = cagr_series == sorted(cagr_series, reverse=True)
+
     at_3x = next(p for p in measured if p.multiple == 3.0)
     out.sharpe_at_3x = at_3x.sharpe
     if out.base_sharpe > 0.05:
         out.sharpe_retained_at_3x = round(at_3x.sharpe / out.base_sharpe, 4)
     out.survives_5x = measured[-1].cagr_pct > 0
+    if not out.monotonic:
+        out.note = (
+            "Return is not monotonic in cost here. Stops and targets are set from the "
+            "actual fill price, so changing the cost level moves those levels and a "
+            "different set of trades gets stopped out. Read the curve as five separate "
+            "backtests, not as one strategy being taxed."
+        )
 
-    # Break-even: the round-trip cost at which CAGR first crosses zero, found by
+    # Break-even: the round-trip cost at which CAGR FIRST crosses zero, found by
     # scanning the measured levels and interpolating linearly inside the bracket that
-    # contains the crossing. It is a scan, not a solve.
+    # contains the crossing. It is a scan, not a solve - and with a non-monotonic curve
+    # "first crossing" is the honest reading, not "the crossing".
     for lower, upper in zip(measured, measured[1:]):
         if lower.cagr_pct > 0 >= upper.cagr_pct:
             span = lower.cagr_pct - upper.cagr_pct
@@ -204,12 +221,12 @@ def cost_sensitivity(
     else:
         if measured[0].cagr_pct <= 0:
             out.breakeven_round_trip_bps = 0.0
-            out.note = "The strategy loses money even with zero transaction costs."
+            out.note = (out.note + " " if out.note else "") + (
+                "The strategy loses money even with zero transaction costs.")
         elif out.survives_5x:
-            out.note = (
+            out.note = (out.note + " " if out.note else "") + (
                 f"Still profitable at 5x the configured costs "
-                f"({measured[-1].round_trip_bps:g} bps round trip); no break-even found in range."
-            )
+                f"({measured[-1].round_trip_bps:g} bps round trip); no break-even found in range.")
     return out
 
 

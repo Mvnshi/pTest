@@ -226,9 +226,14 @@ def _period_stat(
     equity: np.ndarray,
     benchmark: np.ndarray,
     trades: list[Trade],
+    days: int | None = None,
 ) -> PeriodStat:
+    # `days` is passed separately because a period's equity slice deliberately starts
+    # one bar early (see per_year) so its return is measured from the prior close. That
+    # anchor bar belongs to the previous period and must not be counted here.
+    reported = len(equity) if days is None else days
     if len(equity) < 2 or equity[0] <= 0:
-        return PeriodStat(label, len(equity), 0.0, 0.0, 0.0, len(trades), 0.0)
+        return PeriodStat(label, reported, 0.0, 0.0, 0.0, len(trades), 0.0)
     returns = np.diff(equity) / np.where(equity[:-1] > 0, equity[:-1], 1.0)
     sd = float(returns.std(ddof=1)) if len(returns) > 1 else 0.0
     _, worst, _ = _drawdown(equity)
@@ -237,7 +242,7 @@ def _period_stat(
         bench = float(benchmark[-1] / benchmark[0] - 1.0) * 100.0
     return PeriodStat(
         label=label,
-        days=len(equity),
+        days=reported,
         return_pct=round(float(equity[-1] / equity[0] - 1.0) * 100.0, 4),
         benchmark_return_pct=round(bench, 4),
         max_drawdown_pct=round(worst, 4),
@@ -266,6 +271,7 @@ def per_year(result: BacktestResult) -> list[PeriodStat]:
             result.equity[anchor:hi],
             result.benchmark_equity[anchor:hi],
             [t for t in result.trades if t.exit_date[:4] == year],
+            days=hi - lo,
         ))
     return out
 

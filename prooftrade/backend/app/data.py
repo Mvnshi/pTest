@@ -42,6 +42,7 @@ class BarStore:
     def __init__(self, directory: Path | None = None) -> None:
         self.directory = Path(directory or DATA_DIR)
         self._frames: dict[str, pd.DataFrame] = {}
+        self._snapshot_hash = ""
         self._load()
 
     # -- loading -----------------------------------------------------------------
@@ -56,8 +57,15 @@ class BarStore:
             raise DataError(
                 f"No CSV bars in {self.directory}. Run `make data` to generate a snapshot."
             )
+        digest = hashlib.sha256()
         for path in files:
             symbol = path.stem.upper()
+            raw = path.read_bytes()
+            # Hash exactly the bytes we parse, at the moment we parse them, so the
+            # reported hash always describes the data in memory rather than whatever
+            # happens to be on disk the first time someone asks for it.
+            digest.update(path.name.encode("utf-8"))
+            digest.update(raw)
             frame = pd.read_csv(path)
             missing = set(REQUIRED_COLUMNS) - set(frame.columns)
             if missing:
@@ -67,6 +75,7 @@ class BarStore:
             self._frames[symbol] = self._adjust(frame)
         if not self._frames:
             raise DataError(f"No usable symbols in {self.directory}")
+        self._snapshot_hash = digest.hexdigest()[:16]
 
     @staticmethod
     def _adjust(frame: pd.DataFrame) -> pd.DataFrame:
@@ -130,14 +139,10 @@ class BarStore:
             index = index.union(self._frames[name].index)
         return index.sort_values()
 
-    @functools.cached_property
+    @property
     def snapshot_hash(self) -> str:
-        """SHA-256 over the raw files, so a result can be tied to an exact dataset."""
-        digest = hashlib.sha256()
-        for path in sorted(self.directory.glob("*.csv")):
-            digest.update(path.name.encode("utf-8"))
-            digest.update(path.read_bytes())
-        return digest.hexdigest()[:16]
+        """SHA-256 over the loaded files, so a result is tied to an exact dataset."""
+        return self._snapshot_hash
 
     @functools.cached_property
     def date_range(self) -> tuple[str, str]:

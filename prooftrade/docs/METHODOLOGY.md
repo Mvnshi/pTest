@@ -295,6 +295,14 @@ two hand-picked stocks were profitable" is not breadth evidence however good the
 `top_symbol_profit_share` is measured against **gross** profit (the sum of positive symbol P&L), so a
 single huge winner cannot be masked by netting it against losers.
 
+**Cost is not a pure tax.** Stop, target and trailing levels are derived from the actual
+slipped fill (`stop = fill * (1 - pct)`), so changing the cost level moves those levels, a
+different set of trades is stopped out, and the resulting path can be *better* at higher
+cost. This is a real property of a fill-anchored risk model, not a numerical artefact. The
+sweep therefore reports a `monotonic` flag, and when it is false the report says so instead
+of implying the curve is one strategy being progressively taxed. Only strategies with no
+price-level risk rules are guaranteed monotonic in cost.
+
 **Component 5.** Retention is `sharpe_at_3x / sharpe_at_1x`; full marks at 80% retained, with a 0.1
 bonus for still being profitable at 5x costs. If the base Sharpe is `<= 0.05` the ratio is meaningless
 and the component scores 0.2.
@@ -322,6 +330,8 @@ numbers probably do not measure what they appear to. Warnings sort by severity, 
 
 | ID | Trigger | Severity | What to do |
 |---|---|---|---|
+| `account_ruined` | equity reached zero; the run stopped there | critical | Shorts carry no margin or borrow model, so a squeeze is unbounded here. A real broker would have closed you out sooner. |
+| `unaffordable_entries` | an entry could not buy one whole share | info/medium | The per-position budget was below one share, so those symbols were skipped and the tested universe was narrower than the chosen one. |
 | `synthetic_data` | the snapshot is generated, not vendored | critical | Nothing here is a statement about real markets. Run `make data-real` before drawing any conclusion. |
 | `low_trade_count` | `trades < 30` (critical below 10) | high | Widen the universe or lengthen the window. Below 30 trades the Sharpe standard error exceeds most Sharpes worth having. |
 | `concentrated_returns_symbol` | top symbol `> 50%` of gross profit | high | One lucky position dressed as a system. Drop that symbol and re-run. |

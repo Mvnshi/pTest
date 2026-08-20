@@ -101,7 +101,14 @@ own caveats is a bad joke.
 4. **Flat boolean logic only** - `all` or `any`, no nesting.
 5. **No borrow costs, financing, market impact or capacity modelling** on shorts.
 6. **One data source, one snapshot.** Nothing is reconciled against a second vendor.
-7. **A backtest is a lower bound on how wrong you can be**, not an estimate of future
+7. **Cost is not a pure tax.** Stops and targets are set from the actual (slipped) fill
+   price, so raising the cost level moves those levels and a different set of trades gets
+   stopped out. Return is therefore *not* guaranteed to be monotonic in cost — the report
+   detects this and says so on the cost curve rather than smoothing it away.
+8. **Shorts have no margin model.** There is no maintenance requirement and no broker to
+   close you out, so a squeeze is unbounded. The engine stops the run if equity reaches
+   zero and raises a critical warning, which a real account would have hit sooner.
+9. **A backtest is a lower bound on how wrong you can be**, not an estimate of future
    return.
 
 ---
@@ -115,7 +122,7 @@ own caveats is a bad joke.
 | No live broker integration | Same. |
 | No LLM code execution | The adapter's only contract is `text -> JSON`, validated by Pydantic before use. A test asserts the backend contains no `eval`, `exec`, `compile`, `__import__`, `os.system`, or `subprocess`. |
 | Deterministic and reproducible | No wall clock or RNG in the execution path; a test asserts repeat runs are byte-identical, and every report carries a result hash. |
-| Transaction costs and slippage | Required config fields with non-zero defaults; a test asserts returns are monotonically non-increasing in cost. |
+| Transaction costs and slippage | Required config fields with non-zero defaults; a test asserts returns are monotonically non-increasing in cost **for strategies without price-level risk rules**, and a second test pins the documented case where they are not (see below). |
 | Train/test or walk-forward | Every report contains both, and a test asserts the folds tile the window without overlap. |
 | Required warnings | Low trade count, concentrated returns and cost sensitivity are always evaluated; tests assert each fires on constructed inputs. |
 

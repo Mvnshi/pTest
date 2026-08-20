@@ -125,6 +125,9 @@ def run_report(strategy: Strategy, config: BacktestConfig, store: BarStore) -> d
         years_covered=years_covered,
         benchmark=benchmark_metrics,
         skipped_signals=base.skipped_signals,
+        unaffordable_signals=base.unaffordable_signals,
+        ruined=base.ruined,
+        ruin_date=base.ruin_date,
         is_synthetic=is_synthetic,
     )
 
@@ -154,6 +157,9 @@ def run_report(strategy: Strategy, config: BacktestConfig, store: BarStore) -> d
         "evidence": evidence.as_dict(),
         "diagnostics": {
             "skipped_entry_signals": base.skipped_signals,
+            "unaffordable_entry_signals": base.unaffordable_signals,
+            "account_ruined": base.ruined,
+            "ruin_date": base.ruin_date,
             "warmup_bars": strategy.warmup_bars(),
             "universe_size": len(strategy.universe),
             "bars_evaluated": base.n_days,

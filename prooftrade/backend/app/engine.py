@@ -105,7 +105,10 @@ class BacktestResult:
     trades: list[Trade] = field(default_factory=list)
     initial_capital: float = 0.0
     benchmark_symbol: str = ""
-    skipped_signals: int = 0    # entry signals dropped because every slot was full
+    skipped_signals: int = 0        # entry signals dropped because every slot was full
+    unaffordable_signals: int = 0   # entries that could not buy one whole share
+    ruined: bool = False            # equity reached zero; the account stopped trading
+    ruin_date: str = ""
 
     @property
     def n_days(self) -> int:
@@ -156,11 +159,19 @@ class _Panel:
         self.mark = pd.DataFrame(self.close).ffill().to_numpy()
         # Last row on which each symbol has a real bar, so a position in a symbol whose
         # data ends mid-backtest is closed rather than silently carried.
+        #
+        # A symbol that merely runs past the window edge has NOT ended: treating it as
+        # ended would use knowledge of where the window stops to manufacture an exit,
+        # and would give the same calendar day a different outcome in a walk-forward
+        # fold than in the full run.
         self.last_bar = np.full(m, -1, dtype=int)
-        for col in range(m):
+        window_end = dates[-1]
+        for col, symbol in enumerate(self.symbols):
             valid = np.flatnonzero(np.isfinite(self.close[:, col]))
-            if len(valid):
-                self.last_bar[col] = int(valid[-1])
+            if not len(valid):
+                continue
+            history_end = frames[symbol].index[-1]
+            self.last_bar[col] = n - 1 if history_end > window_end else int(valid[-1])
 
 
 def _resolve_window(store: BarStore, strategy: Strategy, config: BacktestConfig) -> pd.DatetimeIndex:
@@ -229,12 +240,20 @@ def run_backtest(
     pending_exits: dict[int, ExitReason] = {}   # col -> reason, filled at the next open
     pending_entries: list[int] = []
     skipped_signals = 0
+    unaffordable_signals = 0
+    ruined = False
+    ruin_date = ""
 
     def close_position(pos: _OpenPosition, index: int, raw_price: float, reason: ExitReason) -> None:
         """Exit at `raw_price` before slippage, book the trade, release the slot."""
         nonlocal cash
         # Exiting a long means selling; exiting a short means buying back.
         fill = raw_price * (1.0 - slippage) if is_long else raw_price * (1.0 + slippage)
+        # The price the trade actually got is by definition inside its own excursion
+        # range. Without this a signal exit - which fills on a bar the trackers never
+        # see - can report a 1% adverse excursion on a trade that lost 50%.
+        pos.peak = max(pos.peak, fill)
+        pos.trough = min(pos.trough, fill)
         quantity = abs(pos.shares)
         exit_commission = quantity * fill * commission
         cash += pos.shares * fill - exit_commission
@@ -266,6 +285,10 @@ def run_backtest(
     for di in range(n_days):
         opens, highs, lows, closes = panel.open[di], panel.high[di], panel.low[di], panel.close[di]
         marks = panel.mark[di]
+        # Marks available at the OPEN: yesterday's closes. Sizing an order that fills at
+        # today's open against today's close would let the size depend on price action
+        # that has not happened yet - the same-bar leak this engine exists to avoid.
+        prior_marks = panel.mark[di - 1] if di > 0 else np.zeros(n_symbols)
 
         # -- 1. queued exits fill at today's open ----------------------------------
         for col in sorted(pending_exits):
@@ -283,7 +306,7 @@ def run_backtest(
             held = np.zeros(n_symbols)
             for col, pos in positions.items():
                 held[col] = pos.shares
-            equity_now = cash + float(np.dot(held, np.nan_to_num(marks, nan=0.0)))
+            equity_now = cash + float(np.dot(held, np.nan_to_num(prior_marks, nan=0.0)))
             slot_notional = max(equity_now, 0.0) / max_positions
             for col in pending_entries:
                 if len(positions) >= max_positions or col in positions:
@@ -299,6 +322,9 @@ def run_backtest(
                     affordable = math.floor(cash / (fill * (1.0 + commission)))
                     shares = min(shares, affordable)
                 if shares <= 0:
+                    # The slot cannot buy one whole share. Silently dropping this would
+                    # make the universe quietly narrower than the user asked for.
+                    unaffordable_signals += 1
                     continue
                 notional = shares * fill
                 entry_commission = notional * commission
@@ -342,10 +368,6 @@ def run_backtest(
                     ref * (1 - risk.trailing_stop_pct / 100.0) if is_long
                     else ref * (1 + risk.trailing_stop_pct / 100.0)
                 )
-            # Now fold today's range into the excursion trackers.
-            pos.peak = max(pos.peak, high)
-            pos.trough = min(pos.trough, low)
-
             adverse = low if is_long else high
             favourable = high if is_long else low
             levels = [(lvl, tag) for lvl, tag in
@@ -366,11 +388,20 @@ def run_backtest(
                 # A gap through the stop fills at the open, not at the stop level.
                 gapped = math.isfinite(op) and ((op < stop_level) if is_long else (op > stop_level))
                 close_position(pos, di, op if gapped else stop_level, stop_tag)
-            elif hit_target:
+                continue
+            if hit_target:
                 gapped = math.isfinite(op) and (
                     (op > pos.target_price) if is_long else (op < pos.target_price)
                 )
                 close_position(pos, di, op if gapped else pos.target_price, "take_profit")
+                continue
+
+            # The position survived the bar, so its whole range is a real excursion.
+            # (On a bar that closes the position, close_position folds in the fill
+            # instead: we assumed the trade ended there, so what the price did
+            # afterwards was not something the position lived through.)
+            pos.peak = max(pos.peak, high)
+            pos.trough = min(pos.trough, low)
 
         # -- 4. mark to market at today's close ------------------------------------
         holdings_value = 0.0
@@ -385,6 +416,24 @@ def run_backtest(
         cash_curve[di] = cash
         exposure_curve[di] = (gross_exposure / equity) if equity > 0 else 0.0
         count_curve[di] = len(positions)
+
+        # An unlevered long book cannot get here, but an unconstrained short can. Once
+        # equity is gone the account is gone: liquidate, freeze the curve and stop.
+        # Carrying on would compound from a negative base and quietly report every
+        # later day as a flat 0% return.
+        if equity <= 0:
+            for col in sorted(positions):
+                pos = positions[col]
+                price = closes[col] if math.isfinite(closes[col]) else marks[col]
+                if math.isfinite(price):
+                    close_position(pos, di, price, "account_ruined")
+            ruined = True
+            ruin_date = date_strings[di]
+            equity_curve[di:] = equity
+            cash_curve[di:] = cash
+            exposure_curve[di:] = 0.0
+            count_curve[di:] = 0.0
+            break
 
         if di == n_days - 1:
             break
@@ -418,7 +467,7 @@ def run_backtest(
             skipped_signals += len(candidates)
 
     # -- liquidate anything still open on the final bar ----------------------------
-    if positions:
+    if positions and not ruined:
         last = n_days - 1
         for col in sorted(positions):
             pos = positions[col]
@@ -445,4 +494,7 @@ def run_backtest(
         initial_capital=float(config.initial_capital),
         benchmark_symbol=config.benchmark,
         skipped_signals=skipped_signals,
+        unaffordable_signals=unaffordable_signals,
+        ruined=ruined,
+        ruin_date=ruin_date,
     )
