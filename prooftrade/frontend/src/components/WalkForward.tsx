@@ -592,44 +592,50 @@ export function WalkForward({ validation }: WalkForwardProps) {
           }
         />
 
-        {neighbours.length === 0 ? null : (
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 px-4 py-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] uppercase tracking-[0.08em] text-muted">Base Sharpe</span>
-            <span className={`mono text-sm ${signClass(paramBaseSharpe)}`}>
-              {fmtRatio(paramBaseSharpe)}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
-              Neighbourhood median
-            </span>
-            <span className={`mono text-sm ${signClass(paramMedianSharpe)}`}>
-              {fmtRatio(paramMedianSharpe)}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] uppercase tracking-[0.08em] text-muted">Fragility</span>
-            <span className={`mono text-sm ${fragilityTone}`}>
-              {fragility === null ? '—' : `${fmtRatio(fragility)}x`}
-            </span>
-          </div>
-          {profitableShare === null ? null : (
-            <div className="flex items-baseline gap-2">
-              <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
-                Variants profitable
-              </span>
-              <span className="mono text-sm text-primary">{fmtPct(profitableShare, 0)}</span>
+        <div className="px-4 py-3">
+          {neighbours.length === 0 ? null : (
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
+                  Base Sharpe
+                </span>
+                <span className={`mono text-sm ${signClass(paramBaseSharpe)}`}>
+                  {fmtRatio(paramBaseSharpe)}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
+                  Neighbourhood median
+                </span>
+                <span className={`mono text-sm ${signClass(paramMedianSharpe)}`}>
+                  {fmtRatio(paramMedianSharpe)}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
+                  Fragility
+                </span>
+                <span className={`mono text-sm ${fragilityTone}`}>
+                  {fragility === null ? '—' : `${fmtRatio(fragility)}x`}
+                </span>
+              </div>
+              {profitableShare === null ? null : (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
+                    Variants profitable
+                  </span>
+                  <span className="mono text-sm text-primary">{fmtPct(profitableShare, 0)}</span>
+                </div>
+              )}
             </div>
           )}
-        </div>
-        )}
 
-        <p className="px-4 py-3 text-xs leading-5 text-muted">
-          A real edge sits on a plateau: nudge a period or a threshold and the result barely moves.
-          A spike - base Sharpe far above the median of its own neighbours - means the number was
-          found, not earned.
-        </p>
+          <p className="text-xs leading-5 text-muted">
+            A real edge sits on a plateau: nudge a period or a threshold and the result barely
+            moves. A spike - base Sharpe far above the median of its own neighbours - means the
+            number was found, not earned.
+          </p>
+        </div>
 
         {neighbours.length === 0 ? (
           <p className="px-4 pb-4 text-sm leading-6 text-muted">

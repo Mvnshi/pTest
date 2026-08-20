@@ -125,17 +125,21 @@ A 0–100 score with a visible component breakdown (no black box):
 
 | Component | Weight | Measures |
 |---|---:|---|
-| Sample size | 20 | Number of closed trades vs a 100-trade reference |
+| Sample size | 20 | Number of closed trades, log-scaled from 10 to 400 |
 | Out-of-sample consistency | 20 | OOS Sharpe retained vs in-sample |
-| Breadth | 15 | Share of universe symbols profitable; top-symbol PnL concentration |
+| Breadth | 15 | Share of universe symbols profitable; top-symbol PnL concentration; scaled down below 8 symbols |
 | Time consistency | 15 | Share of calendar years and regimes profitable |
 | Cost robustness | 15 | Sharpe retained at 3× costs |
 | Parameter robustness | 15 | Base Sharpe vs perturbed-neighbourhood median |
 
-Mandatory warnings (each with severity, evidence value, and threshold):
-low trade count · concentrated returns (top symbol, top 5 trades) · cost sensitivity ·
-out-of-sample degradation · short history · fragile parameters · low market exposure ·
-severe drawdown · fixed-universe hindsight bias · single-snapshot data caveat.
+Mandatory warnings (each with severity, measured value, and threshold):
+low trade count · concentrated returns (top symbol, top 5 trades, top 10 days) ·
+cost sensitivity · thin cost margin · out-of-sample degradation · fragile parameters ·
+narrow universe · short history · single regime · low exposure · severe drawdown ·
+thin profit factor · benchmark underperformance · binding position cap ·
+fixed-universe hindsight bias · single-snapshot data caveat · synthetic-data caveat.
+
+The full trigger table with thresholds is in `docs/METHODOLOGY.md` section 10.
 
 ### FR-9 Reporting UI
 Equity curve (strategy vs buy-and-hold benchmark) · underwater drawdown curve ·

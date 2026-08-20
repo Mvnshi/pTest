@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -38,6 +39,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# A full report is ~1.4 MB of JSON, most of it the daily series. It compresses to a
+# tenth of that, which matters on the one request the user actually waits for.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(router)
 

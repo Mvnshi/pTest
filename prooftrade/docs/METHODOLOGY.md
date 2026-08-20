@@ -106,30 +106,46 @@ sample (`ddof = 1`).
 | Metric | Formula |
 |---|---|
 | Total return | `E_T / E_0 - 1` |
-| CAGR | `(E_T / E_0)^(252/N) - 1` |
+| CAGR | `(E_T / E_0)^(252/N) - 1`, with `N` in years = `days / 252` |
 | Annualised volatility | `stdev(r) * sqrt(252)` |
 | Sharpe | `mean(r) / stdev(r) * sqrt(252)` |
 | Sortino | `mean(r) / DD * sqrt(252)` with `DD = sqrt(mean(min(r_t, 0)^2))` |
-| Max drawdown | `max_t (1 - E_t / max(E_0..E_t))`, reported positive |
-| Calmar | `CAGR / MaxDD` |
-| Time in market | `days_with_a_position / N` |
-| Average gross exposure | `mean(gross_position_value_t / E_t)` |
-| Turnover (annual) | `sum_trades(entry_notional + exit_notional) / (2 * mean(E) * N/252)` |
+| Max drawdown | `min_t (E_t / max(E_0..E_t) - 1)`, reported **negative** |
+| Longest drawdown | consecutive days spent below the previous equity peak |
+| Calmar | `CAGR / abs(MaxDD)` |
+| Average exposure | `mean(gross_position_value_t / E_t)`, a value of 1.0 meaning fully invested |
 | Win rate | `wins / trade_count`, a win being `net_pnl > 0` |
 | Profit factor | `sum(net_pnl of wins) / abs(sum(net_pnl of losses))` |
-| Average win | `mean(net_pnl of wins)` |
-| Average loss | `mean(abs(net_pnl) of losses)` |
-| Expectancy | `win_rate * avg_win - (1 - win_rate) * avg_loss` |
+| Average win | `mean(return_pct of wins)`, per trade |
+| Average loss | `mean(return_pct of losses)`, per trade, reported **negative** |
+| Expectancy | `mean(return_pct)` across all trades — the average trade, sign included |
 | Average holding days | `mean(exit_index - entry_index)`, in trading days |
+| Total costs | `sum(gross_pnl - net_pnl)` across trades: commission and slippage, both legs |
+| Cost drag | `total_costs / abs(sum(gross_pnl))`, the share of gross profit paid away |
+| Best / worst day | `max(r)` and `min(r)` |
 | Trade count | number of closed trades |
 
-Conventions with more than one accepted definition: **the risk-free rate is 0%**, so Sharpe and Sortino
-are excess over zero — a non-zero rf lowers every Sharpe here, most sharply after 2022, so these figures
-are not comparable to published Sharpes computed over T-bills. **Downside deviation** divides by all `N`
-days, not only the negative ones; the other convention yields a larger Sortino. **Profit factor** with no
-losing trades is `null`, not infinity. **Expectancy** is identically the mean net P&L per trade, shown
-beside a percentage form (mean per-trade `return_pct`) since dollar expectancy grows with equity. All
-trades are closed by construction, so trade statistics contain no open-position P&L.
+Conventions with more than one accepted definition, stated because the choice moves the number:
+
+- **The risk-free rate is 0%**, so Sharpe and Sortino are excess over zero. A non-zero rate lowers
+  every Sharpe here, most sharply after 2022, so these figures are not comparable to published
+  Sharpes computed over T-bills.
+- **Downside deviation divides by all `N` days**, not only the negative ones. The other convention
+  yields a larger Sortino.
+- **Zero-variance guard.** If `stdev(r) <= 1e-9` the dispersion is floating-point noise rather than
+  risk, and Sharpe and Sortino are reported as `0` rather than as the astronomical number the
+  division would produce.
+- **Profit factor** is `0` when there are no winning trades and `inf` when there are no losing ones;
+  the UI renders the latter as `-`.
+- **Average loss and max drawdown are reported with their sign**, so a losing average shows as
+  negative rather than as a positive magnitude.
+- **Exposure is average gross exposure, not the fraction of days invested.** A strategy holding one
+  of five slots reads 0.2, the same as one fully invested on a fifth of days. They are different
+  things and the difference matters for the Sharpe argument below.
+- All trades are closed by construction — anything still open on the final bar is liquidated at that
+  close — so trade statistics contain no open-position P&L.
+- **Metrics for a sub-period** (a year, a regime, an IS/OOS half) are computed on the equity slice for
+  that window, with trades attributed to the window containing their **exit** date.
 
 ### 4.1 Sharpe is inflated by low exposure
 
@@ -142,11 +158,11 @@ Sharpe  ~  sqrt(p) * (mu/sigma) * sqrt(252)     # scales with sqrt(exposure)
 CAGR    ~  p * 252 * mu                         # scales with exposure
 ```
 
-Return falls linearly with exposure; Sharpe falls only with its square root. At 20% time in market,
+Return falls linearly with exposure; Sharpe falls only with its square root. At 20% average exposure,
 Sharpe is flattered by `1/sqrt(0.20) ~= 2.2x` relative to the return actually delivered, because idle days
 add zero to the numerator *and* zero to the denominator, and the ratio rewards the zeros. Separately, only
 about `p*N` observations are informative, so the estimator's standard error is inflated by `1/sqrt(p)`.
-ProofTrade prints time in market beside Sharpe and fires `low_exposure` below 10%.
+ProofTrade prints average exposure beside Sharpe and fires `low_exposure` below 10%.
 
 ## 5. Benchmark
 
@@ -244,55 +260,82 @@ off a forum post has already been selected by someone.
 
 ## 9. Evidence score
 
-`score = 100 * sum(weight_i * subscore_i) / sum(weight_i)`, with every component's raw measurement,
-sub-score and contribution shown in the UI. `ramp(x, lo, hi) = clamp((x - lo)/(hi - lo), 0, 1)`; a
-ramp written with `lo > hi` descends.
+`score = sum(weight_i * subscore_i)` over six components whose weights sum to 100. Every component
+reports its raw measurement, its sub-score and its point contribution, so the total can be rebuilt by
+hand. `ramp(x, lo, hi) = clamp((x - lo)/(hi - lo), 0, 1)`; a ramp written with `lo > hi` descends.
 
 | # | Component | Weight | Measurement -> sub-score |
 |---|---|---:|---|
-| 1 | Sample size | 20 | `ramp(trade_count, 0, 100)` — 0 trades -> 0, 100+ -> 1 |
-| 2 | OOS consistency | 20 | `0.7 * ramp(OOS_sharpe / IS_sharpe, 0, 1) + 0.3 * folds_profitable_fraction` |
-| 3 | Breadth | 15 | `0.5 * ramp(symbols_profitable_fraction, 0.2, 0.6) + 0.5 * ramp(top_symbol_share, 0.7, 0.3)` |
-| 4 | Time consistency | 15 | `0.6 * ramp(years_profitable_fraction, 0.3, 0.7) + 0.4 * regimes_profitable_fraction` |
-| 5 | Cost robustness | 15 | `0.7 * ramp(sharpe_3x / sharpe_1x, 0, 1) + 0.3 * ramp(breakeven_bps, 0, 100)` |
-| 6 | Parameter robustness | 15 | `0.6 * ramp(neighbourhood_median_sharpe / base_sharpe, 0.3, 0.9) + 0.4 * neighbours_profitable_fraction` |
+| 1 | Sample size | 20 | `0` at `trades <= 10`, otherwise `min(1, log10(trades/10) / log10(40))` |
+| 2 | OOS consistency | 20 | `0.67 * base + 0.33 * folds_positive_fraction` |
+| 3 | Breadth | 15 | `size_factor * (0.6 * spread + 0.4 * focus)` |
+| 4 | Time consistency | 15 | `0.6 * ramp(years_positive_fraction, 0.25, 0.7) + 0.4 * regimes_positive_fraction` |
+| 5 | Cost robustness | 15 | `min(1, ramp(sharpe_3x / sharpe_1x, 0, 0.8) + 0.1 * survives_5x)` |
+| 6 | Parameter robustness | 15 | `0.5 * neighbours_profitable_fraction + 0.5 * stability` |
 
-- `top_symbol_share = max_symbol_net_pnl / sum(positive symbol net_pnl)`, which stays well-defined
-  when total net P&L is negative. 70% or more of profit in one symbol scores 0; 30% or less scores 1.
-- Components 2, 5 and 6 are ratios against a base Sharpe. If the base (or in-sample) Sharpe is
-  `<= 0.05` the ratio carries no information and the sub-score is **0**: a strategy with no
-  measurable edge earns no credit for retaining it.
-- Component 4 counts only calendar years with `>= 60` trading days in the window and regimes with
-  `>= 20` days, so a stub period at the window edge cannot swing a fraction.
-- If the neighbourhood is empty, component 6 scores 1.0 and the report says so. The DSL requires an
-  exit, so every valid strategy has a numeric parameter and this is near-unreachable.
+**Component 1 is log-scaled** because the tenth trade tells you far more than the hundredth. Ten
+trades or fewer scores zero; 400 trades scores one.
+
+**Component 2.** `base` is `ramp(OOS_sharpe / IS_sharpe, 0, 1)`, with two special cases:
+- In-sample Sharpe `<= 0.05`: the ratio carries no information, so `base = 0.35` and the component is
+  labelled *not measurable* — scored as inconclusive, not as a pass.
+- Retention `>= 2.0`: out-of-sample beating in-sample several times over is **not** a bonus. It means
+  the halves do not describe the same process, so `base = 0.6`. Whichever half is unrepresentative,
+  one of them is.
+
+**Component 3.** `spread = ramp(symbols_profitable_fraction, 0.2, 0.6)`,
+`focus = ramp(top_symbol_profit_share_pct, 70, 25)`, and
+`size_factor = ramp(universe_size, 1, 8)`. The size factor is the anti-cherry-picking term: "both my
+two hand-picked stocks were profitable" is not breadth evidence however good the ratio looks, so a
+2-symbol universe caps this component at about 14% of its weight and a 1-symbol universe at zero.
+`top_symbol_profit_share` is measured against **gross** profit (the sum of positive symbol P&L), so a
+single huge winner cannot be masked by netting it against losers.
+
+**Component 5.** Retention is `sharpe_at_3x / sharpe_at_1x`; full marks at 80% retained, with a 0.1
+bonus for still being profitable at 5x costs. If the base Sharpe is `<= 0.05` the ratio is meaningless
+and the component scores 0.2.
+
+**Component 6.** `stability = ramp(base_sharpe / neighbourhood_median_sharpe, 2.5, 1.0)` — a ratio near
+1.0 is a plateau, above 2.5 the chosen parameters are suspiciously special. When the neighbourhood
+median Sharpe is `<= 0.05` but the base works, the fragility ratio is capped at 9.99 rather than
+dividing by near-zero. A strategy with no numeric parameters to perturb scores a neutral 0.5 and says so.
 
 **Grades:** A `>= 80` · B `65-79` · C `50-64` · D `35-49` · F `< 35`.
 
 **What the score is not.** It is a **confidence-in-the-evidence** score: how much to trust what this
-backtest is telling you, not whether the strategy will make money. The two come apart in both directions.
-A strategy that loses money across 400 trades, 18 symbols, 20 years, every regime and 5x costs can score
-highly — it is saying *the evidence that this is bad is trustworthy*. A spectacular equity curve built on
-11 trades in one symbol during one bull market scores F, and should. Read the score with the metrics,
-never instead of them.
+backtest is telling you, not whether the strategy will make money. The two come apart in both
+directions. A strategy that loses money across 400 trades, 18 symbols, 20 years, every regime and 5x
+costs can score highly — that is the report saying *the evidence that this is bad is trustworthy*. A
+spectacular equity curve built on 11 trades in one symbol during one bull market scores F, and should.
+Read the score with the metrics, never instead of them. The seeded demo strategies are deliberately
+spread across the grade range and none of them was tuned to land on a particular grade.
 
 ## 10. Warnings
 
-Every warning is evaluated on every run and reported with its trigger value beside its threshold.
-`info` warnings are unconditional facts about the method; `high` warnings mean the headline numbers
-probably do not measure what they appear to.
+Every warning is evaluated on every run and reported with its measured value beside its threshold.
+`info` warnings are unconditional facts about the method; `critical` and `high` mean the headline
+numbers probably do not measure what they appear to. Warnings sort by severity, then by id.
 
 | ID | Trigger | Severity | What to do |
 |---|---|---|---|
-| `low_trade_count` | `trade_count < 30` | high | Widen the universe or lengthen the window. Below 30 trades the Sharpe standard error exceeds most Sharpes worth having. |
-| `concentrated_returns` | top symbol `> 50%` of net profit, or top 5 trades `> 50%` | high | Re-read the per-symbol heatmap. You may have one lucky position dressed as a system. Drop the top symbol and re-run. |
-| `cost_sensitive` | Sharpe at 3x costs `< 50%` of base, or CAGR negative below 50 bps per leg | high | The edge is inside the spread. Assume real fills are worse than modelled and treat it as untradeable at retail costs. |
-| `oos_degradation` | degradation `> 40%` | high | The rule did not survive the regime change. Check whether the in-sample half rests on one dominant episode. |
-| `short_history` | trades span `< 3 years`, or `< 2` regimes covered | medium | You have tested one market, not markets. Extend the window before concluding anything. |
-| `fragile_parameters` | base Sharpe `> 1.5x` neighbourhood median | high | The result depends on the exact numbers you typed. Prefer a neighbour that is merely good over a peak that is exceptional. |
-| `low_exposure` | time in market `< 10%` | medium | See section 4.1: Sharpe is flattered by about `1/sqrt(exposure)`. Compare CAGR instead. |
-| `severe_drawdown` | max drawdown `> 35%` | medium | Sizing, not the signal, is the problem. Most people abandon a system well before a 35% drawdown ends. |
-| `universe_hindsight` | always | info | The 18 symbols were picked in 2026 knowing who survived. Results are biased upward by an unknown amount. |
+| `synthetic_data` | the snapshot is generated, not vendored | critical | Nothing here is a statement about real markets. Run `make data-real` before drawing any conclusion. |
+| `low_trade_count` | `trades < 30` (critical below 10) | high | Widen the universe or lengthen the window. Below 30 trades the Sharpe standard error exceeds most Sharpes worth having. |
+| `concentrated_returns_symbol` | top symbol `> 50%` of gross profit | high | One lucky position dressed as a system. Drop that symbol and re-run. |
+| `concentrated_returns_trades` | top 5 trades `> 50%` of gross profit, with `>= 10` trades | high | Remove the five best trades and look again. |
+| `concentrated_returns_days` | top 10 up-days `> 60%` of all up-day return, over `> 250` days | medium | Check those days are not data artefacts. |
+| `cost_sensitive` | Sharpe at 3x costs `< 50%` of base | high | The edge is inside the spread. Assume real fills are worse than modelled. |
+| `thin_cost_margin` | break-even `< 50 bps` round trip (high below 25) | medium/high | Real fills on real size routinely exceed this. |
+| `oos_degradation` | degradation `> 40%` (high above 70%) | medium/high | The rule did not survive the regime change. |
+| `fragile_parameters` | base Sharpe `> 1.5x` neighbourhood median (high above 2.5x) | medium/high | The result depends on the exact numbers you typed. Prefer a neighbour that is merely good over a peak that is exceptional. |
+| `narrow_universe` | `< 5` symbols (high at `<= 2`) | medium/high | A rule validated on a couple of hand-picked names is a statement about those names. |
+| `short_history` | `< 3` calendar years contain trades | high | You have tested one market, not markets. |
+| `single_regime` | `< 2` regimes contain trades | medium | Untested is not the same as safe. |
+| `low_exposure` | average exposure `< 10%` | medium | See section 4.1: Sharpe is flattered by roughly `1/sqrt(exposure)`. Compare CAGR instead. |
+| `severe_drawdown` | max drawdown worse than `-35%` | high | Most people abandon a system well before a 35% drawdown ends. |
+| `thin_profit_factor` | profit factor `< 1.10` with `>= 20` trades | medium | A small worsening in fills flips this negative. |
+| `underperforms_benchmark` | strategy CAGR below buy-and-hold CAGR (high if `> 3` points behind) | medium/high | Whatever the risk-adjusted figures say, the simplest alternative made more money. That is the bar. |
+| `position_cap_binding` | dropped entry signals `> 20%` of trades taken | medium | The engine kept the alphabetically first symbols and dropped the rest. That tie-break is arbitrary; a different one gives a different result. |
+| `universe_hindsight` | always | info | The 18 symbols were picked knowing who survived. Results are biased upward by an unknown amount. |
 | `single_data_source` | always | info | One vendor, one snapshot, no cross-vendor reconciliation. Bad ticks and adjustment errors are inherited silently. |
 
 ## 11. What this does not prove

@@ -352,9 +352,11 @@ export function EvidencePanel({ evidence, reproducibility, dataIsSynthetic }: Ev
           <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
             Score components
           </h3>
-          <span className="mono text-[11px] text-muted">
-            {fmtNum(rows.length, 0)} components · 100 pts total
-          </span>
+          {rows.length === 0 ? null : (
+            <span className="mono text-[11px] text-muted">
+              {fmtNum(rows.length, 0)} components · 100 pts total
+            </span>
+          )}
         </div>
         {rows.length === 0 ? (
           <p className="px-4 pb-3 text-xs text-muted">
@@ -378,9 +380,11 @@ export function EvidencePanel({ evidence, reproducibility, dataIsSynthetic }: Ev
           <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
             Warnings
           </h3>
-          <span className="mono text-[11px] text-muted">
-            {fmtNum(warnings.length, 0)} raised · most severe first
-          </span>
+          {warnings.length === 0 ? null : (
+            <span className="mono text-[11px] text-muted">
+              {fmtNum(warnings.length, 0)} raised · most severe first
+            </span>
+          )}
         </div>
         {warnings.length === 0 ? (
           <p className="px-4 pb-3 text-xs text-muted">
