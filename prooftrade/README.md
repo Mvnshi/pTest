@@ -144,6 +144,21 @@ prooftrade/
 `docs/ARCHITECTURE.md` has the module map and the design decisions.
 `docs/METHODOLOGY.md` has every formula, threshold and caveat.
 
+### Strategy DSL v2 (`dsl_v2/`)
+
+A separate, versioned successor to the v1 grammar in `backend/app/dsl.py`: typed exit
+rules with a fixed priority table, four sizing methods including volatility-based,
+calendar filters, and execution assumptions and costs carried inside the document so a
+result is reproducible from the strategy alone. Ships as a JSON Schema (generated from
+the Pydantic models), TypeScript types, a semantic validator with a human error
+catalogue, five worked examples and 97 tests.
+
+```bash
+python -m dsl_v2.cli dsl_v2/examples/*.json --explain
+```
+
+The engine still executes v1; `dsl_v2/README.md` §11 lists what differs and why.
+
 ---
 
 ## API

@@ -1,0 +1,56 @@
+{
+  "dsl_version": "2.0.0",
+  "name": "Monday dip buy with a liquidity screen",
+  "description": "A day-of-week seasonal, restricted to liquid names and closed on a mean-reversion signal. Exercises: days_of_week filter, liquidity screen, fixed_notional sizing, signal_exit with crosses_above, next_close fills.",
+  "source_text": "On Mondays, buy liquid names trading below their 10-day average. Put 20,000 into each. Exit when the close crosses back above the 10-day EMA, or after 8 bars, with a 4% stop.",
+  "universe": {
+    "symbols": ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "JPM", "KO", "JNJ", "XOM"],
+    "liquidity": {"min_avg_dollar_volume": 100000000, "lookback": 60}
+  },
+  "direction": "long",
+  "entry": {
+    "logic": "all",
+    "conditions": [
+      {
+        "left": {"kind": "price", "field": "close"},
+        "op": "below",
+        "right": {"kind": "indicator", "name": "sma", "period": 10}
+      }
+    ]
+  },
+  "exits": [
+    {"kind": "percent_stop", "percent": 4, "trail": false},
+    {
+      "kind": "signal_exit",
+      "logic": "any",
+      "conditions": [
+        {
+          "left": {"kind": "price", "field": "close"},
+          "op": "crosses_above",
+          "right": {"kind": "indicator", "name": "ema", "period": 10}
+        }
+      ]
+    },
+    {"kind": "time_exit", "max_bars": 8}
+  ],
+  "sizing": {
+    "method": "fixed_notional",
+    "max_open_positions": 5,
+    "notional": 20000
+  },
+  "calendar": {
+    "days_of_week": [1]
+  },
+  "execution": {
+    "signal_timing": "close",
+    "fill_timing": "next_close",
+    "intrabar_priority": "stop_first",
+    "gap_policy": "fill_at_open",
+    "candidate_priority": "highest_dollar_volume"
+  },
+  "costs": {
+    "commission_bps": 2,
+    "slippage_model": "fixed_bps",
+    "slippage_bps": 5
+  }
+}

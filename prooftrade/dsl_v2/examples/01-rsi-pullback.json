@@ -1,0 +1,51 @@
+{
+  "dsl_version": "2.0.0",
+  "name": "RSI pullback in an uptrend",
+  "description": "Buy oversold dips only while the long-term trend is up. Exercises: between, above, less_than, percent_stop, r_multiple_target, time_exit, equal_weight sizing.",
+  "source_text": "Buy when RSI(14) is between 20 and 30 and the close is above the 200-day moving average. Risk 5% and take profit at 2R, or give up after 15 bars.",
+  "universe": {
+    "symbols": ["SPY", "QQQ", "IWM", "DIA", "XLK", "XLV"]
+  },
+  "direction": "long",
+  "entry": {
+    "logic": "all",
+    "conditions": [
+      {
+        "left": {"kind": "indicator", "name": "rsi", "period": 14},
+        "op": "between",
+        "right": {"kind": "range", "low": 20, "high": 30}
+      },
+      {
+        "left": {"kind": "price", "field": "close"},
+        "op": "above",
+        "right": {"kind": "indicator", "name": "sma", "period": 200}
+      },
+      {
+        "left": {"kind": "indicator", "name": "pct_change", "period": 5},
+        "op": "less_than",
+        "right": {"kind": "constant", "value": -3}
+      }
+    ]
+  },
+  "exits": [
+    {"kind": "percent_stop", "percent": 5, "trail": false},
+    {"kind": "r_multiple_target", "multiple": 2},
+    {"kind": "time_exit", "max_bars": 15}
+  ],
+  "sizing": {
+    "method": "equal_weight",
+    "max_open_positions": 4
+  },
+  "execution": {
+    "signal_timing": "close",
+    "fill_timing": "next_open",
+    "intrabar_priority": "stop_first",
+    "gap_policy": "fill_at_open",
+    "candidate_priority": "alphabetical"
+  },
+  "costs": {
+    "commission_bps": 1,
+    "slippage_model": "fixed_bps",
+    "slippage_bps": 5
+  }
+}
