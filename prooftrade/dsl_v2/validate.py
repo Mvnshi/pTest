@@ -17,6 +17,7 @@ fixing one and rediscovering the next.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,9 @@ _UNION_TAGS = frozenset({
     "atr_stop", "percent_stop", "r_multiple_target", "percent_target",
     "time_exit", "signal_exit", "opposite_signal",
 })
+
+
+_CODED = re.compile(r"^\[([A-Z_]+)\]\s*(.*)$", re.S)
 
 
 def _article(noun: str) -> str:
@@ -139,8 +143,14 @@ def _describe_schema_error(err: dict[str, Any]) -> Issue:
         )
     if kind == "value_error":
         message = str(ctx.get("error", err.get("msg", "invalid value")))
-        code = E.E_BAD_TICKER if "ticker" in message else E.E_OUT_OF_RANGE
-        return error(code, path, message[0].upper() + message[1:] + ".", given)
+        # Validators tag their message with `[CODE]` via models.coded(), so the mapper
+        # reads the code rather than guessing it from the wording.
+        tagged = _CODED.match(message)
+        if tagged:
+            return error(tagged.group(1), path, tagged.group(2).strip(), given)
+        return error(
+            E.E_OUT_OF_RANGE, path, message[0].upper() + message[1:].rstrip(".") + ".", given
+        )
 
     return error(
         E.E_WRONG_TYPE, path,
@@ -387,6 +397,15 @@ def _check_execution(strategy: Strategy, out: ValidationResult) -> None:
             "Assuming the target fills before the stop when a single bar covers both "
             "flatters every result, and a daily bar contains no evidence for it. "
             "'stop_first' is the honest default.",
+        ))
+    if strategy.execution.intrabar_priority == "target_first" and not any(
+        e.kind in TARGET_KINDS for e in strategy.exits
+    ):
+        out.warnings.append(warning(
+            E.W_INERT_INTRABAR_PRIORITY, "/execution/intrabar_priority",
+            "'target_first' decides which of a stop and a target fills when one bar "
+            "covers both, but this strategy has no target exit, so the setting can never "
+            "apply. Remove it, or add a target if one was intended.",
         ))
     if strategy.execution.gap_policy == "fill_at_level":
         out.warnings.append(warning(

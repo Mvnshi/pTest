@@ -23,7 +23,13 @@ from jsonschema import Draft202012Validator
 
 from dsl_v2 import errors as E
 from dsl_v2.generate_schema import build as build_schema
-from dsl_v2.models import EXIT_PRIORITY, MIRROR, Strategy
+from dsl_v2.models import (
+    DEFAULT_MIN_INDICATOR_PERIOD,
+    EXIT_PRIORITY,
+    MIN_PERIOD_BY_INDICATOR,
+    MIRROR,
+    Strategy,
+)
 from dsl_v2.validate import validate, validate_file, validate_json
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -575,3 +581,212 @@ def test_no_dsl_module_can_execute_anything():
                 assert node.func.id not in {"eval", "exec", "compile", "__import__"}, (
                     f"{path.name}:{node.lineno} calls {node.func.id}()"
                 )
+
+
+# ======================================================================================
+# 8. Minimum indicator periods
+# ======================================================================================
+# A one-period window is not a short window, it is a different quantity wearing the
+# indicator's name: SMA(1) is the close, RSI(1) is a constant 0 or 100. A DSL that
+# promises to be explainable must not accept a rule whose plain-English reading is false.
+
+
+def indicator_doc(name: str, period: int) -> dict:
+    """One condition on `name`, paired with a unit-compatible right side, so the period
+    rule is the only thing that can fail."""
+    partner = {
+        "price": {"kind": "price", "field": "close"},
+        "volume": {"kind": "price", "field": "volume"},
+        "oscillator": {"kind": "constant", "value": 50},
+        "percent": {"kind": "constant", "value": 5},
+    }
+    import dsl_v2.models as models
+
+    unit = models.INDICATOR_UNITS[name]
+    right = partner[unit]
+    op = "greater_than" if right["kind"] == "constant" else "above"
+    return minimal(entry={"logic": "all", "conditions": [
+        {"left": {"kind": "indicator", "name": name, "period": period},
+         "op": op, "right": right}]})
+
+
+@pytest.mark.parametrize("name,minimum", sorted(MIN_PERIOD_BY_INDICATOR.items()))
+def test_the_documented_minimum_period_is_enforced(name: str, minimum: int):
+    if minimum > 1:
+        result = validate(indicator_doc(name, minimum - 1))
+        assert not result.ok, f"{name} accepted period {minimum - 1}"
+        assert E.E_PERIOD_TOO_SHORT in codes(result)
+        message = next(i for i in result.errors if i.code == E.E_PERIOD_TOO_SHORT).message
+        assert str(minimum) in message and name in message
+    assert validate(indicator_doc(name, minimum)).ok, f"{name} rejected its own minimum"
+
+
+@pytest.mark.parametrize("name", sorted(MIN_PERIOD_BY_INDICATOR))
+def test_ordinary_periods_are_accepted(name: str):
+    assert validate(indicator_doc(name, 20)).ok
+
+
+def test_percent_change_is_the_documented_exception():
+    assert MIN_PERIOD_BY_INDICATOR["pct_change"] == 1
+    assert validate(indicator_doc("pct_change", 1)).ok, (
+        "a one-bar percent change is the daily return, which is meaningful"
+    )
+    assert {n for n, m in MIN_PERIOD_BY_INDICATOR.items() if m == 1} == {"pct_change"}
+
+
+def test_every_indicator_has_a_declared_minimum():
+    import dsl_v2.models as models
+
+    assert set(MIN_PERIOD_BY_INDICATOR) == set(models.INDICATOR_UNITS)
+    assert DEFAULT_MIN_INDICATOR_PERIOD == 2
+
+
+def test_the_error_explains_what_the_period_would_degenerate_into():
+    message = next(
+        i.message for i in validate(indicator_doc("sma", 1)).errors
+        if i.code == E.E_PERIOD_TOO_SHORT
+    )
+    assert "the close itself" in message
+    assert '"field": "close"' in message, "should name the field the author probably meant"
+
+
+def test_the_standalone_schema_enforces_the_same_minimums():
+    """Otherwise a non-Python consumer would accept documents Pydantic rejects."""
+    validator = Draft202012Validator(SCHEMA)
+    for name, minimum in MIN_PERIOD_BY_INDICATOR.items():
+        if minimum > 1:
+            too_short = list(validator.iter_errors(indicator_doc(name, minimum - 1)))
+            assert too_short, f"schema accepted {name} period {minimum - 1}"
+        assert not list(validator.iter_errors(indicator_doc(name, minimum)))
+
+
+# ======================================================================================
+# 9. Intrabar priority: exactly one interpretation
+# ======================================================================================
+
+
+STOP_AND_TARGET = [
+    {"kind": "percent_stop", "percent": 5, "trail": False},
+    {"kind": "percent_target", "percent": 10},
+    {"kind": "time_exit", "max_bars": 10},
+]
+
+
+def execution(**overrides) -> dict:
+    base = {"signal_timing": "close", "fill_timing": "next_open",
+            "intrabar_priority": "stop_first", "gap_policy": "fill_at_open",
+            "candidate_priority": "alphabetical"}
+    base.update(overrides)
+    return base
+
+
+def order_for(document: dict) -> list[str]:
+    result = validate(document)
+    assert result.ok, result.format()
+    return [e.kind for e in result.strategy.exits_in_priority_order()]
+
+
+def test_omitting_intrabar_priority_defaults_to_stop_first():
+    document = minimal(exits=list(STOP_AND_TARGET))
+    document.pop("execution", None)
+    assert validate(document).strategy.execution.intrabar_priority == "stop_first"
+    assert order_for(document) == ["percent_stop", "percent_target", "time_exit"]
+
+
+def test_explicit_stop_first_matches_the_default():
+    explicit = minimal(exits=list(STOP_AND_TARGET), execution=execution())
+    implicit = minimal(exits=list(STOP_AND_TARGET))
+    implicit.pop("execution", None)
+    assert order_for(explicit) == order_for(implicit)
+
+
+def test_explicit_target_first_governs_the_stop_target_pair():
+    document = minimal(exits=list(STOP_AND_TARGET),
+                       execution=execution(intrabar_priority="target_first"))
+    assert order_for(document) == ["percent_target", "percent_stop", "time_exit"]
+
+
+def test_target_first_moves_only_the_stop_target_pair():
+    """Time and signal exits keep their bands; nothing else is reshuffled."""
+    exits = [
+        {"kind": "atr_stop", "atr_period": 14, "multiple": 2, "trail": False},
+        {"kind": "percent_target", "percent": 10},
+        {"kind": "time_exit", "max_bars": 10},
+        {"kind": "opposite_signal"},
+    ]
+    document = minimal(exits=exits, execution=execution(intrabar_priority="target_first"))
+    assert order_for(document) == [
+        "percent_target", "atr_stop", "time_exit", "opposite_signal"]
+
+
+def test_the_effective_priority_table_is_the_single_source_of_truth():
+    """An engine reading effective_exit_priority cannot disagree with another engine."""
+    conservative = validate(minimal(exits=list(STOP_AND_TARGET),
+                                    execution=execution())).strategy
+    aggressive = validate(minimal(exits=list(STOP_AND_TARGET),
+                                  execution=execution(intrabar_priority="target_first"))).strategy
+
+    base = conservative.effective_exit_priority()
+    assert base == EXIT_PRIORITY, "stop_first must leave the base table untouched"
+
+    moved = aggressive.effective_exit_priority()
+    assert moved["percent_target"] < moved["percent_stop"]
+    assert moved["r_multiple_target"] < moved["atr_stop"]
+    # Bands that have nothing to do with the stop/target pair are unchanged.
+    for kind in ("time_exit", "signal_exit", "opposite_signal"):
+        assert moved[kind] == EXIT_PRIORITY[kind]
+
+
+def test_exit_array_order_is_still_irrelevant_under_target_first():
+    forwards = minimal(exits=list(STOP_AND_TARGET),
+                       execution=execution(intrabar_priority="target_first"))
+    backwards = minimal(exits=list(reversed(STOP_AND_TARGET)),
+                        execution=execution(intrabar_priority="target_first"))
+    assert order_for(forwards) == order_for(backwards)
+
+
+def test_target_first_is_flagged_as_the_aggressive_assumption():
+    document = minimal(exits=list(STOP_AND_TARGET),
+                       execution=execution(intrabar_priority="target_first"))
+    result = validate(document)
+    assert result.ok, "aggressive is not invalid, only worth saying out loud"
+    assert E.W_TARGET_FIRST in warning_codes(result)
+
+
+def test_target_first_without_a_target_is_an_inert_setting():
+    document = minimal(exits=[{"kind": "percent_stop", "percent": 5, "trail": False}],
+                       execution=execution(intrabar_priority="target_first"))
+    result = validate(document)
+    assert result.ok
+    assert E.W_INERT_INTRABAR_PRIORITY in warning_codes(result)
+
+
+def test_invalid_execution_configurations_are_rejected():
+    for field, bad in [
+        ("intrabar_priority", "whichever_is_better"),
+        ("fill_timing", "same_close"),
+        ("signal_timing", "open"),
+        ("gap_policy", "fill_at_midpoint"),
+        ("candidate_priority", "random"),
+    ]:
+        result = validate(minimal(execution=execution(**{field: bad})))
+        assert E.E_NOT_IN_ENUM in codes(result), f"{field}={bad!r} was accepted"
+        assert any(i.path == f"/execution/{field}" for i in result.errors)
+
+
+def test_signal_timing_admits_only_close():
+    """Any other value would permit same-bar execution."""
+    import typing
+    import dsl_v2.models as models
+
+    assert typing.get_args(models.Execution.model_fields["signal_timing"].annotation) == ("close",)
+
+
+def test_typescript_mirrors_the_effective_priority_rule():
+    assert "effectiveExitPriority" in TS
+    assert "MIN_PERIOD_BY_INDICATOR" in TS
+    match = re.search(r"MIN_PERIOD_BY_INDICATOR: Record<IndicatorName, number> = \{(.*?)\n\}",
+                      TS, re.S)
+    assert match, "strategy.ts has no MIN_PERIOD_BY_INDICATOR table"
+    found = {k: int(v) for k, v in re.findall(r"(\w+):\s*(\d+)", match.group(1))}
+    assert found == MIN_PERIOD_BY_INDICATOR

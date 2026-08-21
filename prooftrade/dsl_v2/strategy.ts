@@ -46,6 +46,36 @@ export type IndicatorName =
   | 'pct_change'     // percent change of close over `period` bars
   | 'volume_sma'     // simple moving average of volume
 
+/**
+ * Minimum period per indicator, enforced by the Python models and mirrored into the
+ * generated JSON Schema.
+ *
+ * Two is the floor for anything that averages, smooths or spans a window: SMA(1) is
+ * just the close, RSI(1) is a constant 0 or 100, ATR(1) is the bar's own true range.
+ * Those are ways of writing something else by accident. `pct_change` is the exception —
+ * a one-bar percent change is the daily return.
+ */
+export const MIN_PERIOD_BY_INDICATOR: Record<IndicatorName, number> = {
+  sma: 2,
+  ema: 2,
+  rsi: 2,
+  atr: 2,
+  highest_high: 2,
+  lowest_low: 2,
+  pct_change: 1,
+  volume_sma: 2,
+}
+
+/**
+ * `highest_high(20)` on bar t is the highest high of bars t-20..t-1, EXCLUDING bar t.
+ *
+ * Engine-facing contract, intentionally not enforceable by a validator: this package
+ * checks documents and never computes an indicator. A reference that included today's
+ * own high could never be broken, which would make every `crosses_above` against it
+ * silently dead.
+ */
+export const EXCLUDES_CURRENT_BAR: readonly IndicatorName[] = ['highest_high', 'lowest_low']
+
 export const INDICATOR_UNITS: Record<IndicatorName, Unit> = {
   sma: 'price',
   ema: 'price',
@@ -166,12 +196,12 @@ export type ExitKind =
   | 'opposite_signal'
 
 /**
- * Lower number wins when several exits fire on the same bar. Stops before targets is
- * the conservative assumption: when a bar's range covers both, a daily bar cannot say
- * which came first, so the engine assumes the outcome that hurts.
+ * Base precedence between exit KINDS. Lower number wins.
  *
- * Because priority is fixed here, reordering the `exits` array can never change a
- * backtest.
+ * This table is the default only. The stop-versus-target pair is additionally governed
+ * by `execution.intrabar_priority`. Do not read this table directly when implementing
+ * an engine — call `effectiveExitPriority(strategy)`, which folds both rules into one
+ * answer.
  */
 export const EXIT_PRIORITY: Record<ExitKind, number> = {
   atr_stop: 0,
@@ -344,7 +374,17 @@ export interface Execution {
    */
   signal_timing: 'close'
   fill_timing: 'next_open' | 'next_close'
-  /** Which fills when one bar's range covers both a stop and a target. */
+  /**
+   * Which fills when one bar's range covers both a stop and a target. A daily bar
+   * records no intrabar path, so this is an assumption either way.
+   *
+   * `stop_first` (default) is the CONSERVATIVE assumption: it books the outcome that
+   * hurts and cannot flatter a result.
+   *
+   * `target_first` is the AGGRESSIVE assumption. It books the favourable outcome from a
+   * bar containing no evidence for it, inflating win rate, profit factor and return
+   * together. The validator warns on it every time. See `effectiveExitPriority`.
+   */
   intrabar_priority: 'stop_first' | 'target_first'
   /** Where an order fills when the bar opens beyond the level. */
   gap_policy: 'fill_at_open' | 'fill_at_level'
@@ -423,6 +463,47 @@ export interface ValidationResult {
 }
 
 /** Narrowing helpers, so call sites never test `kind` with a bare string. */
+export const STOP_KINDS: readonly ExitKind[] = ['atr_stop', 'percent_stop']
+export const TARGET_KINDS: readonly ExitKind[] = ['r_multiple_target', 'percent_target']
+
+/**
+ * Exit precedence for one document, with the intrabar rule already applied.
+ *
+ * Two rules govern which exit wins, and this folds them into one number per kind so an
+ * engine never has to reconcile them itself:
+ *
+ * 1. `EXIT_PRIORITY` orders the kinds in general: stops, targets, time, signals.
+ * 2. `execution.intrabar_priority` decides the stop-versus-target pair when a single
+ *    daily bar's range covers both levels. `stop_first` (the default) keeps the base
+ *    order; `target_first` moves targets ahead of stops, and only that pair.
+ *
+ * Rule 2 wins where they overlap, because a field that could never change an outcome
+ * would be a lie. Two conforming engines calling this get identical numbers.
+ *
+ * Mirrors `Strategy.effective_exit_priority()` in models.py.
+ */
+export function effectiveExitPriority(strategy: Strategy): Record<ExitKind, number> {
+  const priority: Record<ExitKind, number> = { ...EXIT_PRIORITY }
+  if (strategy.execution.intrabar_priority === 'target_first') {
+    const stopBand = Math.min(...STOP_KINDS.map((k) => EXIT_PRIORITY[k]))
+    for (const kind of TARGET_KINDS) priority[kind] = stopBand - 1
+  }
+  return priority
+}
+
+/**
+ * This document's exits in the exact order an engine must test them.
+ *
+ * Authoritative — not the `exits` array, and not `EXIT_PRIORITY` alone. Mirrors
+ * `Strategy.exits_in_priority_order()`.
+ */
+export function exitsInPriorityOrder(strategy: Strategy): ExitRule[] {
+  const priority = effectiveExitPriority(strategy)
+  return [...strategy.exits].sort(
+    (a, b) => priority[a.kind] - priority[b.kind] || a.kind.localeCompare(b.kind),
+  )
+}
+
 export const isSeriesOperand = (o: RightOperand): o is SeriesOperand =>
   o.kind === 'price' || o.kind === 'indicator'
 

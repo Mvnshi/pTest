@@ -40,6 +40,16 @@ MAX_EXITS = 6
 _TICKER = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
 
+def coded(code: str, message: str) -> str:
+    """Tag a validator message with its catalogue code.
+
+    Pydantic flattens a validator's `ValueError` into an untyped `value_error`, so
+    without this the error mapper would have to guess the code by sniffing the message
+    text. The `[CODE]` prefix is stripped before the message reaches a reader.
+    """
+    return f"[{code}] {message}"
+
+
 class _Node(BaseModel):
     """Base for every DSL node: unknown fields are an error, not a shrug."""
 
@@ -83,12 +93,52 @@ INDICATOR_UNITS: dict[str, Unit] = {
     "volume_sma": "volume",
 }
 
-# Indicators whose value on bar t must not include bar t itself. A breakout reference
-# that included today's own high could never be broken.
+# Indicators whose value on bar t must not include bar t itself.
+#
+# ENGINE-FACING CONTRACT, INTENTIONALLY NOT ENFORCEABLE HERE. This package validates
+# documents; it never computes an indicator, so it has nothing to check this against.
+# It is exported so an engine implementer has one authoritative place to read the rule
+# rather than inferring it from the indicator's name: `highest_high(20)` on bar t is the
+# highest high of bars t-20..t-1, EXCLUDING bar t. A breakout reference that included
+# today's own high could never be broken, which would make every `crosses_above` against
+# it silently dead. A conforming engine must exclude the current bar; a document cannot
+# express anything that would violate it.
 EXCLUDES_CURRENT_BAR = frozenset({"highest_high", "lowest_low"})
 
-# `pct_change` over one bar is meaningful; a one-bar average is not.
-MIN_PERIOD_BY_INDICATOR: dict[str, int] = {"pct_change": 1}
+# Minimum period per indicator, enforced by IndicatorOperand below and mirrored into the
+# generated JSON Schema so a non-Python consumer rejects the same documents.
+#
+# Two is the floor for anything that averages, smooths or spans a window: SMA(1) is just
+# the close, RSI(1) is a constant 0 or 100, ATR(1) is the bar's own true range, and a
+# one-bar highest high is the bar's own high. Those are not useful readings, they are
+# ways of writing something else by accident, and a DSL that promises to be explainable
+# should not accept a rule whose plain-English reading is a lie.
+#
+# `pct_change` is the exception: a one-bar percent change is the daily return, which is
+# both meaningful and commonly wanted.
+DEFAULT_MIN_INDICATOR_PERIOD = 2
+MIN_PERIOD_BY_INDICATOR: dict[str, int] = {
+    "sma": 2,
+    "ema": 2,
+    "rsi": 2,
+    "atr": 2,
+    "highest_high": 2,
+    "lowest_low": 2,
+    "pct_change": 1,
+    "volume_sma": 2,
+}
+
+# What a one-period reading would degenerate into, quoted back in the error so the
+# message explains the rule instead of merely asserting it.
+_DEGENERATE_AT_ONE: dict[str, str] = {
+    "sma": "the close itself",
+    "ema": "the close itself",
+    "rsi": "a constant 0 or 100",
+    "atr": "the bar's own true range",
+    "highest_high": "the bar's own high",
+    "lowest_low": "the bar's own low",
+    "volume_sma": "the bar's own volume",
+}
 
 
 class PriceOperand(_Node):
@@ -111,6 +161,22 @@ class IndicatorOperand(_Node):
     kind: Literal["indicator"] = "indicator"
     name: IndicatorName
     period: int = Field(ge=MIN_PERIOD, le=MAX_PERIOD)
+
+    @model_validator(mode="after")
+    def _period_is_meaningful(self) -> "IndicatorOperand":
+        minimum = MIN_PERIOD_BY_INDICATOR.get(self.name, DEFAULT_MIN_INDICATOR_PERIOD)
+        if self.period >= minimum:
+            return self
+        parts = [
+            f"{self.name} needs a period of at least {minimum}, not {self.period}."
+        ]
+        if self.name in _DEGENERATE_AT_ONE:
+            parts.append(
+                f"At {self.period} it is {_DEGENERATE_AT_ONE[self.name]} written the long way."
+            )
+        if self.name in ("sma", "ema"):
+            parts.append('Use {"kind": "price", "field": "close"} if that is what you meant.')
+        raise ValueError(coded("E_PERIOD_TOO_SHORT", " ".join(parts)))
 
     @property
     def unit(self) -> Unit:
@@ -256,9 +322,13 @@ ExitKind = Literal[
     "signal_exit", "opposite_signal",
 ]
 
-# Lower number wins. Stops before targets is the conservative assumption: when a bar's
-# range covers both, the daily bar cannot tell us which came first, so we assume the
-# outcome that hurts.
+# Base precedence between exit KINDS. Lower number wins.
+#
+# This table is the default only. The stop-versus-target pair is additionally governed
+# by `execution.intrabar_priority`, and a document that sets `target_first` overrides
+# these two bands for itself. Do not read this table directly when implementing an
+# engine - call `Strategy.effective_exit_priority()`, which folds the two rules into one
+# answer. See Strategy.exits_in_priority_order.
 EXIT_PRIORITY: dict[str, int] = {
     "atr_stop": 0,
     "percent_stop": 0,
@@ -458,7 +528,10 @@ class Universe(_Node):
         for raw in self.symbols:
             symbol = raw.strip().upper()
             if not _TICKER.match(symbol):
-                raise ValueError(f"invalid ticker {raw!r}")
+                raise ValueError(coded(
+                    "E_BAD_TICKER",
+                    f"Invalid ticker {raw!r}. Tickers are 1-10 characters, starting with "
+                    f"a letter, using A-Z, 0-9, '.' and '-' only."))
             if symbol not in seen:
                 seen.append(symbol)
         object.__setattr__(self, "symbols", sorted(seen))
@@ -496,11 +569,14 @@ class Calendar(_Node):
     def _bounds(self) -> "Calendar":
         if self.days_of_week is not None:
             if any(not 1 <= d <= 5 for d in self.days_of_week):
-                raise ValueError("days_of_week must be 1-5 (Mon-Fri); daily bars have no weekend session")
+                raise ValueError(coded(
+                    "E_CALENDAR_WEEKDAY",
+                    "days_of_week must be 1-5 (Mon-Fri). Daily bars have no weekend "
+                    "session, so 6 and 7 could never match a bar."))
             object.__setattr__(self, "days_of_week", sorted(set(self.days_of_week)))
         if self.months is not None:
             if any(not 1 <= m <= 12 for m in self.months):
-                raise ValueError("months must be 1-12")
+                raise ValueError(coded("E_CALENDAR_MONTH", "months must be 1-12."))
             object.__setattr__(self, "months", sorted(set(self.months)))
         return self
 
@@ -532,7 +608,21 @@ class Execution(_Node):
     # other value would permit same-bar execution, which is how backtests lie.
     signal_timing: Literal["close"] = "close"
     fill_timing: Literal["next_open", "next_close"] = "next_open"
-    # When a bar's range covers both a stop and a target, which is assumed to fill.
+    # When one bar's range covers both a stop and a target, which is assumed to have
+    # filled. A daily bar records no intrabar path, so this is an assumption either way.
+    #
+    # `stop_first` (default) is the CONSERVATIVE assumption: it books the outcome that
+    # hurts, and cannot flatter a result.
+    #
+    # `target_first` is the AGGRESSIVE assumption. It books the favourable outcome from
+    # a bar that contains no evidence for it, and it improves every affected trade, so
+    # it inflates win rate, profit factor and return together. It is offered because
+    # some strategies genuinely fill the target first and refusing to model that would
+    # be its own distortion - but a document that sets it is making a claim the data
+    # cannot support, and the validator warns about it every time.
+    #
+    # Whichever is set, it governs the stop/target pair - see
+    # Strategy.effective_exit_priority.
     intrabar_priority: Literal["stop_first", "target_first"] = "stop_first"
     # When a bar opens beyond a stop or target level, where the order fills.
     gap_policy: Literal["fill_at_open", "fill_at_level"] = "fill_at_open"
@@ -620,13 +710,41 @@ class Strategy(_Node):
     execution: Execution = Field(default_factory=Execution)
     costs: Costs = Field(default_factory=Costs)
 
-    def exits_in_priority_order(self) -> list[ExitRule]:
-        """Exits sorted the way the engine must evaluate them.
+    def effective_exit_priority(self) -> dict[str, int]:
+        """Exit precedence for THIS document, with the intrabar rule already applied.
 
-        Sorted by priority then by kind, so list order in the document can never change
-        a backtest and two documents differing only in exit order are equivalent.
+        Two rules govern which exit wins, and this folds them into one number per kind
+        so that an engine never has to reconcile them itself:
+
+        1. `EXIT_PRIORITY` orders the kinds in general: stops, then targets, then the
+           time exit, then signal exits.
+        2. `execution.intrabar_priority` decides the stop-versus-target pair when a
+           single daily bar's range covers both levels. `stop_first` (the default) keeps
+           the base order. `target_first` moves targets ahead of stops - and ONLY that
+           pair; the time and signal bands are untouched.
+
+        Rule 2 wins where the two overlap, because a field that could never change an
+        outcome would be a lie. That is the whole of the precedence contract: two
+        conforming engines calling this function get identical numbers, so they cannot
+        disagree about which exit filled.
         """
-        return sorted(self.exits, key=lambda e: (EXIT_PRIORITY[e.kind], e.kind))
+        priority = dict(EXIT_PRIORITY)
+        if self.execution.intrabar_priority == "target_first":
+            stop_band = min(priority[k] for k in STOP_KINDS)
+            for kind in TARGET_KINDS:
+                priority[kind] = stop_band - 1
+        return priority
+
+    def exits_in_priority_order(self) -> list[ExitRule]:
+        """This document's exits in the exact order an engine must test them.
+
+        THIS is the authoritative order, not the `exits` array and not `EXIT_PRIORITY`
+        on its own. Sorted by effective priority then by kind name, so the array's own
+        order can never change a backtest and two documents differing only in exit order
+        are the same strategy.
+        """
+        priority = self.effective_exit_priority()
+        return sorted(self.exits, key=lambda e: (priority[e.kind], e.kind))
 
     def initial_stop(self) -> ExitRule | None:
         """The stop that defines 1R, if there is one."""

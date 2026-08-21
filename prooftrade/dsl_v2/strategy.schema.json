@@ -392,7 +392,37 @@
         "period"
       ],
       "title": "IndicatorOperand",
-      "type": "object"
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "enum": [
+                  "atr",
+                  "ema",
+                  "highest_high",
+                  "lowest_low",
+                  "rsi",
+                  "sma",
+                  "volume_sma"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "period": {
+                "minimum": 2
+              }
+            }
+          },
+          "$comment": "period >= 2: a shorter window degenerates into the price or volume field itself. Enforced identically by models.IndicatorOperand."
+        }
+      ]
     },
     "Liquidity": {
       "additionalProperties": false,

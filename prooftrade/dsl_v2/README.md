@@ -17,10 +17,25 @@ examples/              five strategies covering the whole grammar
 tests/                 97 tests, including drift checks across all three
 ```
 
+From the `prooftrade` directory:
+
 ```bash
-python -m dsl_v2.cli examples/*.json --explain    # validate and read back as prose
-python -m dsl_v2.generate_schema --check          # fail if the schema is stale
-python -m pytest dsl_v2/tests -q
+make verify            # python tests + schema freshness + tsc --strict + CLI on examples
+make test-dsl          # just this package's tests
+make dsl-schema        # fail if strategy.schema.json is stale
+make dsl-typecheck     # real tsc, not the Python regex drift check
+make dsl-cli           # validate every example
+```
+
+The CLI runs two ways, and they differ in where you have to be standing:
+
+```bash
+# From `prooftrade`, where the package is importable:
+python -m dsl_v2.cli examples/*.json --explain
+
+# From anywhere - running the file directly bootstraps its own import path:
+python /path/to/prooftrade/dsl_v2/cli.py strategy.json
+cat strategy.json | python /path/to/prooftrade/dsl_v2/cli.py -
 ```
 
 ---
@@ -108,8 +123,22 @@ Three operand kinds, plus a range used only by `between`:
 | `pct_change` | Percent change of close over N bars | percent | 1 |
 | `volume_sma` | Simple moving average of volume | volume | 2 |
 
-`highest_high` and `lowest_low` **exclude the current bar**. A breakout reference that
-included today's own high could never be broken.
+**Minimum periods are enforced**, by the Pydantic models and by the generated JSON
+Schema alike, so a standalone consumer rejects exactly what Python rejects. Two is the
+floor for anything that averages, smooths or spans a window: `SMA(1)` is the close,
+`RSI(1)` is a constant 0 or 100, `ATR(1)` is the bar's own true range, a one-bar highest
+high is the bar's own high. Those are not short windows, they are different quantities
+wearing the indicator's name, and a grammar that promises to be explainable should not
+accept a rule whose plain-English reading is false. `pct_change` is the exception: a
+one-bar percent change is the daily return.
+
+`highest_high` and `lowest_low` **exclude the current bar**: `highest_high(20)` on bar
+`t` is the highest high of bars `t-20 .. t-1`. A breakout reference that included today's
+own high could never be broken, which would make every `crosses_above` against it
+silently dead. This is an **engine-facing contract** and is deliberately not enforceable
+here — this package validates documents and never computes an indicator, so it has
+nothing to check it against. It is exported as `EXCLUDES_CURRENT_BAR` in both `models.py`
+and `strategy.ts` so an implementer has one authoritative place to read the rule.
 
 **Units are enforced.** Comparing an RSI reading to a dollar price is a validation
 error, not a silent nonsense result.
@@ -161,9 +190,39 @@ one of each kind.
 | `signal_exit` | `logic`, `conditions` | 3 |
 | `opposite_signal` | — | 3 |
 
-**Lower priority number wins** when several fire on the same bar. Stops before targets
-is the conservative assumption: when one bar's range covers both, a daily bar contains
-no evidence of which came first, so the engine assumes the outcome that hurts.
+**Lower priority number wins** when several fire on the same bar.
+
+### Precedence, and the one place it is decided
+
+Two rules govern which exit wins, and the second overrides the first where they meet:
+
+1. The table above orders the exit **kinds** in general.
+2. `execution.intrabar_priority` decides the **stop-versus-target pair** when a single
+   daily bar's range covers both levels. `stop_first` (the default) keeps the base
+   order. `target_first` moves targets ahead of stops — and only that pair; the time and
+   signal bands are untouched.
+
+Rule 2 wins where the two overlap, because a field that could never change an outcome
+would be a lie.
+
+**An engine must not read the priority table directly.** Call
+`Strategy.effective_exit_priority()` (Python) or `effectiveExitPriority(strategy)`
+(TypeScript), which fold both rules into one number per kind, or
+`exits_in_priority_order()` / `exitsInPriorityOrder()`, which return the exact order to
+test. Two conforming engines calling these get identical answers, so they cannot
+disagree about which exit filled. That is the whole precedence contract: it is a
+function, not a paragraph, so there is nothing left to interpret.
+
+Stops before targets is the **conservative** assumption: when one bar's range covers
+both, a daily bar contains no evidence of which came first, so the engine books the
+outcome that hurts. `target_first` is the **aggressive** assumption — it books the
+favourable outcome from a bar that contains no evidence for it, and because it improves
+every affected trade it inflates win rate, profit factor and return together. It exists
+because some strategies genuinely do fill the target first and refusing to model that
+would be its own distortion, but a document that sets it is making a claim the data
+cannot support, and the validator warns every time (`W_TARGET_FIRST`). Setting it on a
+strategy that has no target at all is inert and warns separately
+(`W_INERT_INTRABAR_PRIORITY`).
 
 **Stops and targets are intrabar**, checked against the bar's high and low.
 **Time and signal exits are end-of-bar**, filled under `execution.fill_timing`.
@@ -228,6 +287,9 @@ trading day, so `days_of_week` is 1–5 (ISO, Mon–Fri).
 `signal_timing` has one legal value. Any other would permit same-bar execution, which is
 how backtests lie; the field exists so the assumption is stated rather than implied.
 
+`intrabar_priority` is the aggressive/conservative switch described in §5. It is the one
+execution field that changes which exit fills rather than only where it fills.
+
 **Costs** carry commission (bps per leg, plus an optional per-order minimum) and one of
 two slippage models: `fixed_bps`, or `atr_fraction` which scales with the symbol's own
 volatility. `slippage_bps` has no plain default because it is model-specific — it is
@@ -258,6 +320,7 @@ structural errors are reported together, and then all semantic ones.
 | S6 | Required fields present: `name`, `universe`, `entry`, `exits`, `sizing` |
 | S7 | The left side of a comparison is a series — a constant there is a type error |
 | S8 | Tickers match `^[A-Z][A-Z0-9.\-]{0,9}$` |
+| S9 | Indicator periods meet their per-indicator minimum (2, or 1 for `pct_change`) — enforced by the schema's `if`/`then` rules as well as by the models |
 
 ### Semantic (enforced by `validate.py`)
 
@@ -279,7 +342,9 @@ structural errors are reported together, and then all semantic ones.
 | V14 | `fraction × max_open_positions ≤ 1` — no implicit leverage | `E_SIZING_OVER_ALLOCATION` |
 | V15 | Slippage carries its model's parameters, and no others | `E_SLIPPAGE_*_PARAM` |
 | V16 | `calendar.date_range.start < end` | `E_CALENDAR_DATE_ORDER` |
-| V17 | `days_of_week ⊆ 1..5` — daily bars have no weekend session | (value error) |
+| V17 | `days_of_week ⊆ 1..5` — daily bars have no weekend session | `E_CALENDAR_WEEKDAY` |
+| V18 | `months ⊆ 1..12` | `E_CALENDAR_MONTH` |
+| V19 | Indicator period meets its minimum | `E_PERIOD_TOO_SHORT` |
 
 ### Warnings — never block
 
@@ -295,6 +360,7 @@ structural errors are reported together, and then all semantic ones.
 | W8 | Fewer than 3 symbols | `W_NARROW_UNIVERSE` |
 | W9 | A condition duplicated inside one group | `W_DUPLICATE_CONDITION` |
 | W10 | A fixed and a trailing stop together (the tighter binds) | `W_TRAILING_AND_FIXED` |
+| W11 | `target_first` on a strategy with no target — the setting can never apply | `W_INERT_INTRABAR_PRIORITY` |
 
 ---
 
@@ -316,6 +382,10 @@ the reader guess at *where* and *what to do instead*:
 `path` is a JSON Pointer, so an editor can highlight the node without re-deriving the
 location from the message.
 
+Model validators tag their message with `[CODE]` (see `models.coded`), which the error
+mapper reads and strips. The alternative — inferring the code from the wording — breaks
+the moment someone rewrites a message.
+
 ### Catalogue
 
 | Code | Message shape |
@@ -326,7 +396,10 @@ location from the message.
 | `E_NOT_IN_ENUM` | 'method' must be 'equal_weight', 'fixed_fraction', 'fixed_notional' or 'atr_risk'. The DSL uses closed vocabularies so that every strategy can be explained and executed the same way everywhere. |
 | `E_OUT_OF_RANGE` | 'period' is out of range (less than equal 500). |
 | `E_BAD_LENGTH` | 'symbols' must not be empty. |
-| `E_BAD_TICKER` | Invalid ticker '../etc/passwd'. |
+| `E_BAD_TICKER` | Invalid ticker '../etc/passwd'. Tickers are 1-10 characters, starting with a letter, using A-Z, 0-9, '.' and '-' only. |
+| `E_PERIOD_TOO_SHORT` | sma needs a period of at least 2, not 1. At 1 it is the close itself written the long way. Use {"kind": "price", "field": "close"} if that is what you meant. |
+| `E_CALENDAR_WEEKDAY` | days_of_week must be 1-5 (Mon-Fri). Daily bars have no weekend session, so 6 and 7 could never match a bar. |
+| `E_CALENDAR_MONTH` | months must be 1-12. |
 | `E_NOT_AN_OBJECT` | The document is not valid JSON: Expecting property name at line 1, column 25. |
 | `E_COMPARISON_NEEDS_SERIES` | 'above' compares one series against another, but the right side is a constant. Use 'greater_than'/'less_than' to compare against a fixed number, or put a price field or indicator on the right. |
 | `E_COMPARISON_NEEDS_CONSTANT` | 'greater_than' compares against a fixed number, but the right side is an indicator. |
@@ -373,6 +446,17 @@ rejected one.
 * **Patch** — clarified docs, better messages. No document changes meaning.
 * **Minor** — new optional field with a documented default. Old documents still valid.
 * **Major** — anything that changes what an existing document means, or removes a case.
+
+### 2.0.0 hardening pass
+
+No grammar change, so `dsl_version` stays at `2.0.0` — but two documents that used to
+validate no longer do, which is worth knowing if any exist:
+
+* An indicator with `period: 1` (other than `pct_change`) is now rejected. The minimum
+  was always documented; it simply was not enforced.
+* `execution.intrabar_priority` now demonstrably governs the stop/target pair through
+  `effective_exit_priority()`. The intended reading is unchanged; it was previously only
+  implied, which left two conforming engines free to disagree.
 
 ### Differences from v1.0.0
 

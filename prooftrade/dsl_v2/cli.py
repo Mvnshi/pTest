@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """Validate strategy documents from the command line.
 
-    python -m dsl_v2.cli examples/*.json
+Two ways to run it, and they differ in where you have to be standing:
+
+    # From anywhere - the script bootstraps its own import path.
+    python /path/to/prooftrade/dsl_v2/cli.py strategy.json
+
+    # From the `prooftrade` directory, where `dsl_v2` is importable.
+    python -m dsl_v2.cli examples/*.json --explain
     python -m dsl_v2.cli strategy.json --json     # machine-readable issues
     cat strategy.json | python -m dsl_v2.cli -
 
+`python -m` needs the package on `sys.path`, which means running it from `prooftrade`.
+Running the file directly works from any directory because of the bootstrap below.
+
 Exit status: 0 when every document is valid, 1 when any has an error, 2 on bad usage.
-Warnings never affect the exit status - they are for the reader, not for CI.
+Warnings never affect the exit status unless --strict is passed.
 """
 
 from __future__ import annotations
@@ -16,7 +25,15 @@ import json
 import sys
 from pathlib import Path
 
-from .validate import validate_json
+if __package__ in (None, ""):
+    # Invoked as a plain script (`python dsl_v2/cli.py`), so there is no package
+    # context and the relative import below would fail. Put the package's parent on
+    # sys.path so the tool works from any working directory - a validator you can only
+    # run from one directory is a validator people stop running.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from dsl_v2.validate import validate_json
+else:
+    from .validate import validate_json
 
 
 def main(argv: list[str] | None = None) -> int:

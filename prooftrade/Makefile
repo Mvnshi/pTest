@@ -11,7 +11,8 @@ PIP     := backend/.venv/bin/pip
 PYTEST  := backend/.venv/bin/pytest
 UVICORN := backend/.venv/bin/uvicorn
 
-.PHONY: setup setup-backend setup-frontend data data-real dev api web test lint build serve clean
+.PHONY: setup setup-backend setup-frontend data data-real dev api web test test-backend \
+        test-dsl dsl-schema dsl-typecheck dsl-cli verify build serve clean
 
 setup: setup-backend setup-frontend
 
@@ -49,8 +50,33 @@ dev:
 	 (cd frontend && npm run dev) & \
 	 wait
 
-test:
+# The whole Python suite: the engine's tests and the DSL's.
+test: test-backend test-dsl
+
+test-backend:
 	cd backend && .venv/bin/python -m pytest tests -q
+
+test-dsl:
+	$(PY) -m pytest dsl_v2/tests -q
+
+# The generated schema must match the models. Fails if someone edited models.py and
+# forgot to regenerate, which would let the Python and JSON descriptions disagree.
+dsl-schema:
+	$(PY) -m dsl_v2.generate_schema --check
+
+# Real tsc, not the Python regex drift test. The regex compares field and enum NAMES;
+# only tsc proves the types are well-formed and that the unions narrow exhaustively.
+dsl-typecheck:
+	frontend/node_modules/.bin/tsc -p dsl_v2/tsconfig.json
+	@echo "dsl_v2 typecheck: ok"
+
+dsl-cli:
+	$(PY) -m dsl_v2.cli dsl_v2/examples/*.json
+
+# Everything a change to the DSL has to survive. Run this before committing.
+verify: test dsl-schema dsl-typecheck dsl-cli
+	@echo ""
+	@echo "verify: python tests, schema freshness, TypeScript strict, CLI examples - all ok"
 
 build:
 	cd frontend && npm run build

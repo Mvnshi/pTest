@@ -16,14 +16,58 @@ import json
 import sys
 from pathlib import Path
 
-from .models import DSL_VERSION, Strategy
+from .models import (
+    DEFAULT_MIN_INDICATOR_PERIOD,
+    DSL_VERSION,
+    MIN_PERIOD,
+    MIN_PERIOD_BY_INDICATOR,
+    Strategy,
+)
 
 SCHEMA_PATH = Path(__file__).parent / "strategy.schema.json"
 SCHEMA_ID = "https://prooftrade.dev/schema/strategy/v2.0.0.json"
 
 
+def _inject_indicator_minimums(schema: dict) -> None:
+    """Mirror the per-indicator minimum period into the schema.
+
+    Pydantic emits one `minimum` for the `period` field because the constraint lives in
+    a model validator, not in the field. Without this, a standalone JSON Schema consumer
+    would accept `sma` with period 1 while the Python models reject it - the two
+    descriptions of one grammar would disagree, which is the exact failure that
+    generating the schema is supposed to make impossible.
+
+    Driven by the same MIN_PERIOD_BY_INDICATOR dict the validator reads, so the two
+    cannot drift. Expressed as if/then rather than per-indicator subschemas to keep the
+    discriminated union intact.
+    """
+    definition = schema.get("$defs", {}).get("IndicatorOperand")
+    if definition is None:  # pragma: no cover - the model always produces this
+        raise RuntimeError("IndicatorOperand definition missing from the generated schema")
+
+    by_minimum: dict[int, list[str]] = {}
+    for name, minimum in sorted(MIN_PERIOD_BY_INDICATOR.items()):
+        if minimum > MIN_PERIOD:
+            by_minimum.setdefault(minimum, []).append(name)
+
+    rules = [
+        {
+            "if": {"properties": {"name": {"enum": names}}, "required": ["name"]},
+            "then": {"properties": {"period": {"minimum": minimum}}},
+            "$comment": (
+                f"period >= {minimum}: a shorter window degenerates into the price or "
+                f"volume field itself. Enforced identically by models.IndicatorOperand."
+            ),
+        }
+        for minimum, names in sorted(by_minimum.items())
+    ]
+    if rules:
+        definition.setdefault("allOf", []).extend(rules)
+
+
 def build() -> dict:
     schema = Strategy.model_json_schema(mode="validation")
+    _inject_indicator_minimums(schema)
     ordered = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": SCHEMA_ID,
