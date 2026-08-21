@@ -1,0 +1,899 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prooftrade.dev/schema/strategy/v2.0.0.json",
+  "title": "Strategy",
+  "description": "A complete, self-describing strategy.\n\nSelf-describing means the document carries its own execution assumptions and cost\nmodel, so a result can be reproduced from the strategy alone. A runner may override\ncosts to sweep them for sensitivity analysis, but the override has to be recorded\nalongside the result - the document is the default, not a suggestion.",
+  "$defs": {
+    "AtrStop": {
+      "additionalProperties": false,
+      "description": "Stop placed `multiple` x ATR(period) away from entry.\n\nWith `trail: true` the stop follows the best price reached since entry (a\nChandelier stop) and never moves against the position.",
+      "properties": {
+        "kind": {
+          "const": "atr_stop",
+          "default": "atr_stop",
+          "title": "Kind",
+          "type": "string"
+        },
+        "atr_period": {
+          "default": 14,
+          "maximum": 500,
+          "minimum": 2,
+          "title": "Atr Period",
+          "type": "integer"
+        },
+        "multiple": {
+          "default": 2.0,
+          "exclusiveMinimum": 0,
+          "maximum": 20,
+          "title": "Multiple",
+          "type": "number"
+        },
+        "trail": {
+          "default": false,
+          "title": "Trail",
+          "type": "boolean"
+        }
+      },
+      "title": "AtrStop",
+      "type": "object"
+    },
+    "Calendar": {
+      "additionalProperties": false,
+      "description": "Date and session filters.\n\nThese gate ENTRIES ONLY. Exits are never calendar-gated: a filter that could block\nan exit would be able to trap a position in a stopped-out trade indefinitely, which\nis a way to lose money that no backtest should be able to hide.\n\nOn daily bars a \"session\" is one trading day, so `days_of_week` is limited to\nMonday-Friday (1-5, ISO numbering).",
+      "properties": {
+        "date_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "days_of_week": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 5,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Days Of Week"
+        },
+        "months": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 12,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Months"
+        }
+      },
+      "title": "Calendar",
+      "type": "object"
+    },
+    "Condition": {
+      "additionalProperties": false,
+      "description": "`left <comparison> right`, evaluated on the close of each bar, per symbol.",
+      "properties": {
+        "left": {
+          "discriminator": {
+            "mapping": {
+              "indicator": "#/$defs/IndicatorOperand",
+              "price": "#/$defs/PriceOperand"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PriceOperand"
+            },
+            {
+              "$ref": "#/$defs/IndicatorOperand"
+            }
+          ],
+          "title": "Left"
+        },
+        "op": {
+          "enum": [
+            "above",
+            "below",
+            "crosses_above",
+            "crosses_below",
+            "greater_than",
+            "less_than",
+            "between"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "right": {
+          "discriminator": {
+            "mapping": {
+              "constant": "#/$defs/ConstantOperand",
+              "indicator": "#/$defs/IndicatorOperand",
+              "price": "#/$defs/PriceOperand",
+              "range": "#/$defs/RangeOperand"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PriceOperand"
+            },
+            {
+              "$ref": "#/$defs/IndicatorOperand"
+            },
+            {
+              "$ref": "#/$defs/ConstantOperand"
+            },
+            {
+              "$ref": "#/$defs/RangeOperand"
+            }
+          ],
+          "title": "Right"
+        }
+      },
+      "required": [
+        "left",
+        "op",
+        "right"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "ConditionGroup": {
+      "additionalProperties": false,
+      "description": "A flat conjunction or disjunction.\n\nFlat on purpose. A nested boolean tree needs a nested editor to author, a nested\nrenderer to explain, and a reader who can hold precedence in their head. Two levels\nof `all`/`any` covers every strategy in the example set and every one a demo user\nhas typed. Anything more belongs in code, not in a DSL that promises to be readable.",
+      "properties": {
+        "logic": {
+          "default": "all",
+          "enum": [
+            "all",
+            "any"
+          ],
+          "title": "Logic",
+          "type": "string"
+        },
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Conditions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "conditions"
+      ],
+      "title": "ConditionGroup",
+      "type": "object"
+    },
+    "ConstantOperand": {
+      "additionalProperties": false,
+      "description": "A fixed number: the 30 in \"RSI less than 30\".",
+      "properties": {
+        "kind": {
+          "const": "constant",
+          "default": "constant",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "maximum": 1000000000000.0,
+          "minimum": -1000000000000.0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "ConstantOperand",
+      "type": "object"
+    },
+    "Costs": {
+      "additionalProperties": false,
+      "description": "Transaction costs and slippage.\n\nSlippage moves the fill price against the position; commission is charged on the\nnotional of both legs. `atr_fraction` slippage scales with the symbol's own\nvolatility, which is closer to how real spreads behave than a flat number.",
+      "properties": {
+        "commission_bps": {
+          "default": 1.0,
+          "maximum": 500,
+          "minimum": 0,
+          "title": "Commission Bps",
+          "type": "number"
+        },
+        "commission_min_usd": {
+          "default": 0.0,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Commission Min Usd",
+          "type": "number"
+        },
+        "slippage_model": {
+          "default": "fixed_bps",
+          "enum": [
+            "fixed_bps",
+            "atr_fraction"
+          ],
+          "title": "Slippage Model",
+          "type": "string"
+        },
+        "slippage_bps": {
+          "anyOf": [
+            {
+              "maximum": 500,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slippage Bps"
+        },
+        "slippage_atr_fraction": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 2,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slippage Atr Fraction"
+        },
+        "slippage_atr_period": {
+          "anyOf": [
+            {
+              "maximum": 500,
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slippage Atr Period"
+        }
+      },
+      "title": "Costs",
+      "type": "object"
+    },
+    "DateRange": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
+        },
+        "end": {
+          "format": "date",
+          "title": "End",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "DateRange",
+      "type": "object"
+    },
+    "Execution": {
+      "additionalProperties": false,
+      "description": "Execution assumptions, stated in the document rather than assumed by the engine.\n\nEvery field here changes the reported result. Making them explicit is what lets two\npeople compare two backtests and know they are comparing the same thing.",
+      "properties": {
+        "signal_timing": {
+          "const": "close",
+          "default": "close",
+          "title": "Signal Timing",
+          "type": "string"
+        },
+        "fill_timing": {
+          "default": "next_open",
+          "enum": [
+            "next_open",
+            "next_close"
+          ],
+          "title": "Fill Timing",
+          "type": "string"
+        },
+        "intrabar_priority": {
+          "default": "stop_first",
+          "enum": [
+            "stop_first",
+            "target_first"
+          ],
+          "title": "Intrabar Priority",
+          "type": "string"
+        },
+        "gap_policy": {
+          "default": "fill_at_open",
+          "enum": [
+            "fill_at_open",
+            "fill_at_level"
+          ],
+          "title": "Gap Policy",
+          "type": "string"
+        },
+        "candidate_priority": {
+          "default": "alphabetical",
+          "enum": [
+            "alphabetical",
+            "highest_dollar_volume"
+          ],
+          "title": "Candidate Priority",
+          "type": "string"
+        }
+      },
+      "title": "Execution",
+      "type": "object"
+    },
+    "IndicatorOperand": {
+      "additionalProperties": false,
+      "description": "One indicator reading on the current bar.",
+      "properties": {
+        "kind": {
+          "const": "indicator",
+          "default": "indicator",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "enum": [
+            "sma",
+            "ema",
+            "rsi",
+            "atr",
+            "highest_high",
+            "lowest_low",
+            "pct_change",
+            "volume_sma"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "period": {
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Period",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "period"
+      ],
+      "title": "IndicatorOperand",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "enum": [
+                  "atr",
+                  "ema",
+                  "highest_high",
+                  "lowest_low",
+                  "rsi",
+                  "sma",
+                  "volume_sma"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "period": {
+                "minimum": 2
+              }
+            }
+          },
+          "$comment": "period >= 2: a shorter window degenerates into the price or volume field itself. Enforced identically by models.IndicatorOperand."
+        }
+      ]
+    },
+    "Liquidity": {
+      "additionalProperties": false,
+      "description": "A structural screen applied per symbol per bar, before any entry is considered.\n\nDollar volume rather than share volume: a million shares of a $3 stock and a million\nshares of a $300 stock are not the same market.",
+      "properties": {
+        "min_avg_dollar_volume": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000000000.0,
+          "title": "Min Avg Dollar Volume",
+          "type": "number"
+        },
+        "lookback": {
+          "default": 20,
+          "maximum": 500,
+          "minimum": 2,
+          "title": "Lookback",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min_avg_dollar_volume"
+      ],
+      "title": "Liquidity",
+      "type": "object"
+    },
+    "OppositeSignal": {
+      "additionalProperties": false,
+      "description": "Exit when the mirror of the entry rule fires.\n\nDefined as the entry group with every comparison replaced by its MIRROR (see\n`MIRROR`), keeping the same logic. It is deliberately not \"the entry rule is no\nlonger true\": the negation of `crosses_above` is true on almost every bar, so that\nreading would close a position the day after it opened, every time.",
+      "properties": {
+        "kind": {
+          "const": "opposite_signal",
+          "default": "opposite_signal",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "OppositeSignal",
+      "type": "object"
+    },
+    "PercentStop": {
+      "additionalProperties": false,
+      "description": "Stop `percent` away from entry (or from the best price, when trailing).",
+      "properties": {
+        "kind": {
+          "const": "percent_stop",
+          "default": "percent_stop",
+          "title": "Kind",
+          "type": "string"
+        },
+        "percent": {
+          "exclusiveMinimum": 0,
+          "maximum": 90,
+          "title": "Percent",
+          "type": "number"
+        },
+        "trail": {
+          "default": false,
+          "title": "Trail",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "percent"
+      ],
+      "title": "PercentStop",
+      "type": "object"
+    },
+    "PercentTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "percent_target",
+          "default": "percent_target",
+          "title": "Kind",
+          "type": "string"
+        },
+        "percent": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Percent",
+          "type": "number"
+        }
+      },
+      "required": [
+        "percent"
+      ],
+      "title": "PercentTarget",
+      "type": "object"
+    },
+    "PriceOperand": {
+      "additionalProperties": false,
+      "description": "A raw field of the current bar.",
+      "properties": {
+        "kind": {
+          "const": "price",
+          "default": "price",
+          "title": "Kind",
+          "type": "string"
+        },
+        "field": {
+          "enum": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "title": "Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "PriceOperand",
+      "type": "object"
+    },
+    "RMultipleTarget": {
+      "additionalProperties": false,
+      "description": "Target at `multiple` x the initial risk.\n\n1R is the distance from the entry fill to the INITIAL stop level - not to a trailing\nstop, and not to the sizing model's risk estimate. A strategy therefore cannot\ndeclare an R-multiple target without declaring exactly one stop to measure R from.",
+      "properties": {
+        "kind": {
+          "const": "r_multiple_target",
+          "default": "r_multiple_target",
+          "title": "Kind",
+          "type": "string"
+        },
+        "multiple": {
+          "exclusiveMinimum": 0,
+          "maximum": 20,
+          "title": "Multiple",
+          "type": "number"
+        }
+      },
+      "required": [
+        "multiple"
+      ],
+      "title": "RMultipleTarget",
+      "type": "object"
+    },
+    "RangeOperand": {
+      "additionalProperties": false,
+      "description": "An inclusive numeric interval, used only by the `between` comparison.",
+      "properties": {
+        "kind": {
+          "const": "range",
+          "default": "range",
+          "title": "Kind",
+          "type": "string"
+        },
+        "low": {
+          "maximum": 1000000000000.0,
+          "minimum": -1000000000000.0,
+          "title": "Low",
+          "type": "number"
+        },
+        "high": {
+          "maximum": 1000000000000.0,
+          "minimum": -1000000000000.0,
+          "title": "High",
+          "type": "number"
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ],
+      "title": "RangeOperand",
+      "type": "object"
+    },
+    "SignalExit": {
+      "additionalProperties": false,
+      "description": "An explicit exit rule set, evaluated like the entry group.",
+      "properties": {
+        "kind": {
+          "const": "signal_exit",
+          "default": "signal_exit",
+          "title": "Kind",
+          "type": "string"
+        },
+        "logic": {
+          "default": "any",
+          "enum": [
+            "all",
+            "any"
+          ],
+          "title": "Logic",
+          "type": "string"
+        },
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Conditions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "conditions"
+      ],
+      "title": "SignalExit",
+      "type": "object"
+    },
+    "Sizing": {
+      "additionalProperties": false,
+      "description": "How much to buy, and how many positions may be open at once.\n\n`atr_risk` is the only method that ties size to volatility: it buys the number of\nshares whose loss at the stop equals `risk_fraction` of equity. It is what makes\nR-multiples comparable across symbols.",
+      "properties": {
+        "method": {
+          "enum": [
+            "equal_weight",
+            "fixed_fraction",
+            "fixed_notional",
+            "atr_risk"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "max_open_positions": {
+          "default": 5,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Max Open Positions",
+          "type": "integer"
+        },
+        "max_positions_per_symbol": {
+          "const": 1,
+          "default": 1,
+          "title": "Max Positions Per Symbol",
+          "type": "integer"
+        },
+        "allow_fractional_shares": {
+          "default": false,
+          "title": "Allow Fractional Shares",
+          "type": "boolean"
+        },
+        "fraction": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fraction"
+        },
+        "notional": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notional"
+        },
+        "risk_fraction": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 0.25,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Risk Fraction"
+        },
+        "atr_period": {
+          "anyOf": [
+            {
+              "maximum": 500,
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Atr Period"
+        },
+        "atr_multiple": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Atr Multiple"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "Sizing",
+      "type": "object"
+    },
+    "TimeExit": {
+      "additionalProperties": false,
+      "description": "Maximum holding period, in bars held.\n\nThe exit is *signalled* on the close of the `max_bars`-th bar and *fills* under the\ndocument's `execution.fill_timing`, so a position lives one bar longer than\n`max_bars` when filling at the next open. Stated here because off-by-one in holding\nperiod is the most common silent disagreement between two backtesters.",
+      "properties": {
+        "kind": {
+          "const": "time_exit",
+          "default": "time_exit",
+          "title": "Kind",
+          "type": "string"
+        },
+        "max_bars": {
+          "maximum": 2000,
+          "minimum": 1,
+          "title": "Max Bars",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_bars"
+      ],
+      "title": "TimeExit",
+      "type": "object"
+    },
+    "Universe": {
+      "additionalProperties": false,
+      "properties": {
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Symbols",
+          "type": "array"
+        },
+        "liquidity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Liquidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "symbols"
+      ],
+      "title": "Universe",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "dsl_version": {
+      "const": "2.0.0",
+      "default": "2.0.0",
+      "title": "Dsl Version",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description",
+      "type": "string"
+    },
+    "source_text": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Source Text",
+      "type": "string"
+    },
+    "universe": {
+      "$ref": "#/$defs/Universe"
+    },
+    "direction": {
+      "default": "long",
+      "enum": [
+        "long",
+        "short"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "entry": {
+      "$ref": "#/$defs/ConditionGroup"
+    },
+    "exits": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "atr_stop": "#/$defs/AtrStop",
+            "opposite_signal": "#/$defs/OppositeSignal",
+            "percent_stop": "#/$defs/PercentStop",
+            "percent_target": "#/$defs/PercentTarget",
+            "r_multiple_target": "#/$defs/RMultipleTarget",
+            "signal_exit": "#/$defs/SignalExit",
+            "time_exit": "#/$defs/TimeExit"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/AtrStop"
+          },
+          {
+            "$ref": "#/$defs/PercentStop"
+          },
+          {
+            "$ref": "#/$defs/RMultipleTarget"
+          },
+          {
+            "$ref": "#/$defs/PercentTarget"
+          },
+          {
+            "$ref": "#/$defs/TimeExit"
+          },
+          {
+            "$ref": "#/$defs/SignalExit"
+          },
+          {
+            "$ref": "#/$defs/OppositeSignal"
+          }
+        ]
+      },
+      "maxItems": 6,
+      "minItems": 1,
+      "title": "Exits",
+      "type": "array"
+    },
+    "sizing": {
+      "$ref": "#/$defs/Sizing"
+    },
+    "calendar": {
+      "$ref": "#/$defs/Calendar"
+    },
+    "execution": {
+      "$ref": "#/$defs/Execution"
+    },
+    "costs": {
+      "$ref": "#/$defs/Costs"
+    }
+  },
+  "required": [
+    "name",
+    "universe",
+    "entry",
+    "exits",
+    "sizing"
+  ],
+  "type": "object"
+}

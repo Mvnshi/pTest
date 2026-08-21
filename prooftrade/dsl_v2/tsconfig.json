@@ -1,0 +1,20 @@
+{
+  "// purpose": "Typechecks the DSL's TypeScript surface on its own, independent of the app. The Python drift test compares field and enum NAMES by regex; only tsc proves the types are well-formed and that the discriminated unions narrow.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["strategy.ts", "typecheck.ts"]
+}

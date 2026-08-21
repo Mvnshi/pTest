@@ -1,0 +1,115 @@
+{
+  "snapshot_start": "2006-01-03",
+  "snapshot_end": "2026-06-30",
+  "source": "Synthetic offline generator (scripts/generate_sample_data.py, seed=20260630) - NOT market data",
+  "symbols": [
+    {
+      "symbol": "SPY",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "QQQ",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "IWM",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "DIA",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "TLT",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "GLD",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "XLE",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "XLF",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "XLK",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "XLV",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "AAPL",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "MSFT",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "NVDA",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "AMZN",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "JPM",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "XOM",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "KO",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    },
+    {
+      "symbol": "JNJ",
+      "bars": 5159,
+      "start": "2006-01-03",
+      "end": "2026-06-30"
+    }
+  ]
+}

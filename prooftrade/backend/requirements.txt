@@ -1,0 +1,10 @@
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+pydantic==2.13.1
+pandas==2.3.3
+numpy==2.3.5
+pytest==8.4.2
+httpx==0.28.1
+# Used by dsl_v2/tests to validate the generated JSON Schema standalone,
+# i.e. without going through Pydantic. Without it that suite cannot collect.
+jsonschema==4.26.0

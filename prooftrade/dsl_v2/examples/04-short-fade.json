@@ -1,0 +1,55 @@
+{
+  "dsl_version": "2.0.0",
+  "name": "Short fade of an extended rally",
+  "description": "Short names that have run hard and started to roll over. Exercises: direction short, greater_than, below, ema, pct_change, percent_target, calendar date_range and months.",
+  "source_text": "Short when RSI(14) is above 78, the 5-day change is above 8%, and the close drops below the 5-day EMA. Stop 6%, target 10%, out after 10 bars. Only from 2012 onward, and not in December.",
+  "universe": {
+    "symbols": ["AAPL", "AMZN", "MSFT", "NVDA", "QQQ", "XLK"]
+  },
+  "direction": "short",
+  "entry": {
+    "logic": "all",
+    "conditions": [
+      {
+        "left": {"kind": "indicator", "name": "rsi", "period": 14},
+        "op": "greater_than",
+        "right": {"kind": "constant", "value": 78}
+      },
+      {
+        "left": {"kind": "indicator", "name": "pct_change", "period": 5},
+        "op": "greater_than",
+        "right": {"kind": "constant", "value": 8}
+      },
+      {
+        "left": {"kind": "price", "field": "close"},
+        "op": "below",
+        "right": {"kind": "indicator", "name": "ema", "period": 5}
+      }
+    ]
+  },
+  "exits": [
+    {"kind": "percent_stop", "percent": 6, "trail": false},
+    {"kind": "percent_target", "percent": 10},
+    {"kind": "time_exit", "max_bars": 10}
+  ],
+  "sizing": {
+    "method": "equal_weight",
+    "max_open_positions": 3
+  },
+  "calendar": {
+    "date_range": {"start": "2012-01-01", "end": "2026-06-30"},
+    "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  },
+  "execution": {
+    "signal_timing": "close",
+    "fill_timing": "next_open",
+    "intrabar_priority": "stop_first",
+    "gap_policy": "fill_at_open",
+    "candidate_priority": "alphabetical"
+  },
+  "costs": {
+    "commission_bps": 1,
+    "slippage_model": "fixed_bps",
+    "slippage_bps": 8
+  }
+}

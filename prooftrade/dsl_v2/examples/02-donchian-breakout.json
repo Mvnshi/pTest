@@ -1,0 +1,63 @@
+{
+  "dsl_version": "2.0.0",
+  "name": "Donchian breakout with volatility-scaled risk",
+  "description": "The textbook turtle structure: break the 20-bar high, leave on the 10-bar low, size by ATR so every trade risks the same fraction of equity. Exercises: crosses_above, crosses_below, highest_high, lowest_low, volume filter, atr_risk sizing, trailing atr_stop, signal_exit, r_multiple_target.",
+  "source_text": "Go long when price breaks above the 20-day high on above-average volume. Risk 1% per trade sized on 2xATR, trail a 2xATR stop, take profit at 3R, and exit if price breaks the 10-day low.",
+  "universe": {
+    "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "JPM", "XOM", "GLD", "TLT"],
+    "liquidity": {"min_avg_dollar_volume": 50000000, "lookback": 20}
+  },
+  "direction": "long",
+  "entry": {
+    "logic": "all",
+    "conditions": [
+      {
+        "left": {"kind": "price", "field": "close"},
+        "op": "crosses_above",
+        "right": {"kind": "indicator", "name": "highest_high", "period": 20}
+      },
+      {
+        "left": {"kind": "price", "field": "volume"},
+        "op": "above",
+        "right": {"kind": "indicator", "name": "volume_sma", "period": 20}
+      }
+    ]
+  },
+  "exits": [
+    {"kind": "atr_stop", "atr_period": 14, "multiple": 2, "trail": true},
+    {"kind": "r_multiple_target", "multiple": 3},
+    {
+      "kind": "signal_exit",
+      "logic": "any",
+      "conditions": [
+        {
+          "left": {"kind": "price", "field": "close"},
+          "op": "crosses_below",
+          "right": {"kind": "indicator", "name": "lowest_low", "period": 10}
+        }
+      ]
+    },
+    {"kind": "time_exit", "max_bars": 120}
+  ],
+  "sizing": {
+    "method": "atr_risk",
+    "max_open_positions": 5,
+    "risk_fraction": 0.01,
+    "atr_period": 14,
+    "atr_multiple": 2
+  },
+  "execution": {
+    "signal_timing": "close",
+    "fill_timing": "next_open",
+    "intrabar_priority": "stop_first",
+    "gap_policy": "fill_at_open",
+    "candidate_priority": "highest_dollar_volume"
+  },
+  "costs": {
+    "commission_bps": 1,
+    "commission_min_usd": 1,
+    "slippage_model": "atr_fraction",
+    "slippage_atr_fraction": 0.05,
+    "slippage_atr_period": 14
+  }
+}

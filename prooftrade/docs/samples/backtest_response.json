@@ -1,0 +1,1275 @@
+{
+  "engine_version": "0.1.0",
+  "dsl_version": "1.0.0",
+  "data_snapshot_hash": "bf5665b064e6c569",
+  "data_is_synthetic": true,
+  "config_hash": "91dbd64ba4f3dd16",
+  "strategy": {
+    "dsl_version": "1.0.0",
+    "name": "RSI dip in an uptrend",
+    "source_text": "Buy when RSI(14) drops below 30 and price is above the 200-day moving average; sell when RSI goes above 55 or after 20 days. 8% stop loss.",
+    "universe": [
+      "AAPL",
+      "AMZN",
+      "DIA",
+      "GLD",
+      "IWM",
+      "JNJ",
+      "JPM",
+      "KO",
+      "MSFT",
+      "NVDA",
+      "QQQ",
+      "SPY",
+      "TLT",
+      "XLE",
+      "XLF",
+      "XLK",
+      "XLV",
+      "XOM"
+    ],
+    "position": {
+      "direction": "long",
+      "sizing": "equal_weight",
+      "max_positions": 5,
+      "max_positions_per_symbol": 1
+    },
+    "entry": {
+      "logic": "all",
+      "conditions": [
+        {
+          "left": {
+            "kind": "indicator",
+            "name": "rsi",
+            "period": 14,
+            "k": null,
+            "fast": null,
+            "slow": null,
+            "signal": null
+          },
+          "op": "<",
+          "right": {
+            "kind": "constant",
+            "value": 30.0
+          }
+        },
+        {
+          "left": {
+            "kind": "indicator",
+            "name": "close",
+            "period": null,
+            "k": null,
+            "fast": null,
+            "slow": null,
+            "signal": null
+          },
+          "op": ">",
+          "right": {
+            "kind": "indicator",
+            "name": "sma",
+            "period": 200,
+            "k": null,
+            "fast": null,
+            "slow": null,
+            "signal": null
+          }
+        }
+      ]
+    },
+    "exit": {
+      "logic": "any",
+      "conditions": [
+        {
+          "left": {
+            "kind": "indicator",
+            "name": "rsi",
+            "period": 14,
+            "k": null,
+            "fast": null,
+            "slow": null,
+            "signal": null
+          },
+          "op": ">",
+          "right": {
+            "kind": "constant",
+            "value": 55.0
+          }
+        }
+      ]
+    },
+    "risk": {
+      "stop_loss_pct": 8.0,
+      "take_profit_pct": null,
+      "trailing_stop_pct": null,
+      "max_holding_days": 20
+    }
+  },
+  "strategy_render": {
+    "direction": "long",
+    "universe": [
+      "AAPL",
+      "AMZN",
+      "DIA",
+      "GLD",
+      "IWM",
+      "JNJ",
+      "JPM",
+      "KO",
+      "MSFT",
+      "NVDA",
+      "QQQ",
+      "SPY",
+      "TLT",
+      "XLE",
+      "XLF",
+      "XLK",
+      "XLV",
+      "XOM"
+    ],
+    "entry_logic": "ALL of",
+    "entry": [
+      "RSI(14) is below 30",
+      "Close is above SMA(200)"
+    ],
+    "exit_logic": "ANY of",
+    "exit": [
+      "RSI(14) is above 55",
+      "Stop loss at 8% adverse move",
+      "Time exit after 20 trading days"
+    ],
+    "sizing": "Equal weight, at most 5 concurrent positions (20% of equity each)"
+  },
+  "config": {
+    "start": null,
+    "end": null,
+    "initial_capital": 100000.0,
+    "commission_bps": 1.0,
+    "slippage_bps": 5.0,
+    "benchmark": "SPY",
+    "train_fraction": 0.7,
+    "walk_forward_folds": 5,
+    "run_robustness": true,
+    "seed": 7
+  },
+  "summary": {
+    "start": "2006-01-03",
+    "end": "2026-06-30",
+    "days": 5159,
+    "years": 20.4722,
+    "initial_equity": 100000.0,
+    "final_equity": 120679.0158,
+    "total_return_pct": 20.679,
+    "cagr_pct": 0.9224,
+    "volatility_pct": 3.232,
+    "sharpe": 0.3003,
+    "sortino": 0.4374,
+    "max_drawdown_pct": -11.7388,
+    "max_drawdown_days": 1893,
+    "calmar": 0.0786,
+    "exposure_pct": 6.15,
+    "trades": 109,
+    "win_rate_pct": 62.3853,
+    "profit_factor": 1.4689,
+    "avg_win_pct": 4.5914,
+    "avg_loss_pct": -5.1153,
+    "expectancy_pct": 0.9403,
+    "avg_holding_days": 14.5963,
+    "total_costs": 2759.329,
+    "cost_drag_pct": 11.7727,
+    "best_day_pct": 2.3214,
+    "worst_day_pct": -2.2712
+  },
+  "benchmark": {
+    "start": "2006-01-03",
+    "end": "2026-06-30",
+    "days": 5159,
+    "years": 20.4722,
+    "initial_equity": 99940.0,
+    "final_equity": 746583.0922,
+    "total_return_pct": 647.0313,
+    "cagr_pct": 10.3214,
+    "volatility_pct": 18.0001,
+    "sharpe": 0.6356,
+    "sortino": 0.9433,
+    "max_drawdown_pct": -49.1597,
+    "max_drawdown_days": 911,
+    "calmar": 0.21,
+    "exposure_pct": 0.0,
+    "trades": 0,
+    "win_rate_pct": 0.0,
+    "profit_factor": 0.0,
+    "avg_win_pct": 0.0,
+    "avg_loss_pct": 0.0,
+    "expectancy_pct": 0.0,
+    "avg_holding_days": 0.0,
+    "total_costs": 0.0,
+    "cost_drag_pct": 0.0,
+    "best_day_pct": 13.1313,
+    "worst_day_pct": -13.2021,
+    "symbol": "SPY"
+  },
+  "series": [
+    {
+      "date": "2006-01-03",
+      "equity": 100000.0,
+      "benchmark": 99940.0,
+      "drawdown": 0.0,
+      "benchmark_drawdown": 0.0,
+      "exposure": 0.0
+    },
+    {
+      "date": "2006-01-04",
+      "equity": 100000.0,
+      "benchmark": 100005.09,
+      "drawdown": 0.0,
+      "benchmark_drawdown": 0.0,
+      "exposure": 0.0
+    },
+    {
+      "date": "2006-01-05",
+      "equity": 100000.0,
+      "benchmark": 99988.94,
+      "drawdown": 0.0,
+      "benchmark_drawdown": -0.016,
+      "exposure": 0.0
+    },
+    "... 5153 more points, one per trading day ...",
+    {
+      "date": "2026-06-30",
+      "equity": 120679.02,
+      "benchmark": 746583.09,
+      "drawdown": -0.045,
+      "benchmark_drawdown": -30.355,
+      "exposure": 0.0
+    }
+  ],
+  "trades": [
+    {
+      "symbol": "MSFT",
+      "direction": "long",
+      "entry_date": "2007-06-08",
+      "exit_date": "2007-07-10",
+      "entry_price": 20.243,
+      "exit_price": 20.0638,
+      "shares": 987.0,
+      "notional": 19979.83,
+      "gross_pnl": -156.97,
+      "costs": 23.87,
+      "net_pnl": -180.84,
+      "return_pct": -0.9051,
+      "holding_days": 21,
+      "exit_reason": "time_exit",
+      "mae_pct": -5.9884,
+      "mfe_pct": 4.5462
+    },
+    {
+      "symbol": "XOM",
+      "direction": "long",
+      "entry_date": "2008-07-11",
+      "exit_date": "2008-08-06",
+      "entry_price": 24.9037,
+      "exit_price": 27.1406,
+      "shares": 801.0,
+      "notional": 19947.88,
+      "gross_pnl": 1812.55,
+      "costs": 25.01,
+      "net_pnl": 1787.54,
+      "return_pct": 8.961,
+      "holding_days": 18,
+      "exit_reason": "signal",
+      "mae_pct": -3.8774,
+      "mfe_pct": 10.2481
+    },
+    {
+      "symbol": "TLT",
+      "direction": "long",
+      "entry_date": "2008-10-02",
+      "exit_date": "2008-10-07",
+      "entry_price": 72.1819,
+      "exit_price": 66.3742,
+      "shares": 281.0,
+      "notional": 20283.12,
+      "gross_pnl": -1612.51,
+      "costs": 23.36,
+      "net_pnl": -1635.87,
+      "return_pct": -8.0652,
+      "holding_days": 3,
+      "exit_reason": "stop_loss",
+      "mae_pct": -8.1335,
+      "mfe_pct": 0.2186
+    },
+    "... 106 more trades ..."
+  ],
+  "per_symbol": [
+    {
+      "symbol": "AAPL",
+      "trades": 2,
+      "net_pnl": -881.25,
+      "pnl_share_pct": -0.81,
+      "win_rate_pct": 0.0,
+      "avg_return_pct": -1.9909,
+      "total_return_pct": -3.9819,
+      "best_trade_pct": -0.6096,
+      "worst_trade_pct": -3.3723
+    },
+    {
+      "symbol": "AMZN",
+      "trades": 7,
+      "net_pnl": -1241.99,
+      "pnl_share_pct": -1.14,
+      "win_rate_pct": 42.86,
+      "avg_return_pct": -0.8905,
+      "total_return_pct": -6.2335,
+      "best_trade_pct": 9.1926,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "DIA",
+      "trades": 8,
+      "net_pnl": 1218.9,
+      "pnl_share_pct": 1.12,
+      "win_rate_pct": 75.0,
+      "avg_return_pct": 0.8008,
+      "total_return_pct": 6.4062,
+      "best_trade_pct": 4.4072,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "GLD",
+      "trades": 6,
+      "net_pnl": 1322.69,
+      "pnl_share_pct": 1.21,
+      "win_rate_pct": 50.0,
+      "avg_return_pct": 1.0768,
+      "total_return_pct": 6.4609,
+      "best_trade_pct": 3.2957,
+      "worst_trade_pct": -0.4455
+    },
+    {
+      "symbol": "IWM",
+      "trades": 5,
+      "net_pnl": -608.2,
+      "pnl_share_pct": -0.56,
+      "win_rate_pct": 60.0,
+      "avg_return_pct": -0.5556,
+      "total_return_pct": -2.7779,
+      "best_trade_pct": 5.343,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "JNJ",
+      "trades": 7,
+      "net_pnl": -554.3,
+      "pnl_share_pct": -0.51,
+      "win_rate_pct": 57.14,
+      "avg_return_pct": -0.4792,
+      "total_return_pct": -3.3547,
+      "best_trade_pct": 3.7639,
+      "worst_trade_pct": -5.8984
+    },
+    {
+      "symbol": "JPM",
+      "trades": 5,
+      "net_pnl": 4410.04,
+      "pnl_share_pct": 4.05,
+      "win_rate_pct": 60.0,
+      "avg_return_pct": 4.6179,
+      "total_return_pct": 23.0893,
+      "best_trade_pct": 32.8055,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "KO",
+      "trades": 5,
+      "net_pnl": 2670.07,
+      "pnl_share_pct": 2.45,
+      "win_rate_pct": 80.0,
+      "avg_return_pct": 2.398,
+      "total_return_pct": 11.9901,
+      "best_trade_pct": 5.0649,
+      "worst_trade_pct": -2.7428
+    },
+    {
+      "symbol": "MSFT",
+      "trades": 8,
+      "net_pnl": 6092.74,
+      "pnl_share_pct": 5.6,
+      "win_rate_pct": 75.0,
+      "avg_return_pct": 3.653,
+      "total_return_pct": 29.224,
+      "best_trade_pct": 8.9102,
+      "worst_trade_pct": -2.8462
+    },
+    {
+      "symbol": "NVDA",
+      "trades": 10,
+      "net_pnl": -1650.78,
+      "pnl_share_pct": -1.52,
+      "win_rate_pct": 50.0,
+      "avg_return_pct": -0.604,
+      "total_return_pct": -6.0401,
+      "best_trade_pct": 14.3154,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "QQQ",
+      "trades": 2,
+      "net_pnl": -3182.81,
+      "pnl_share_pct": -2.92,
+      "win_rate_pct": 0.0,
+      "avg_return_pct": -7.6003,
+      "total_return_pct": -15.2006,
+      "best_trade_pct": -7.1354,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "SPY",
+      "trades": 6,
+      "net_pnl": 2406.82,
+      "pnl_share_pct": 2.21,
+      "win_rate_pct": 83.33,
+      "avg_return_pct": 1.8694,
+      "total_return_pct": 11.2164,
+      "best_trade_pct": 6.5578,
+      "worst_trade_pct": -5.7439
+    },
+    {
+      "symbol": "TLT",
+      "trades": 6,
+      "net_pnl": 500.52,
+      "pnl_share_pct": 0.46,
+      "win_rate_pct": 50.0,
+      "avg_return_pct": 0.231,
+      "total_return_pct": 1.386,
+      "best_trade_pct": 6.5023,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "XLE",
+      "trades": 3,
+      "net_pnl": 3108.08,
+      "pnl_share_pct": 2.85,
+      "win_rate_pct": 100.0,
+      "avg_return_pct": 4.6434,
+      "total_return_pct": 13.9301,
+      "best_trade_pct": 5.1951,
+      "worst_trade_pct": 3.9438
+    },
+    {
+      "symbol": "XLF",
+      "trades": 5,
+      "net_pnl": 491.13,
+      "pnl_share_pct": 0.45,
+      "win_rate_pct": 60.0,
+      "avg_return_pct": 0.4238,
+      "total_return_pct": 2.1189,
+      "best_trade_pct": 3.6585,
+      "worst_trade_pct": -2.4741
+    },
+    {
+      "symbol": "XLK",
+      "trades": 6,
+      "net_pnl": 5144.45,
+      "pnl_share_pct": 4.72,
+      "win_rate_pct": 100.0,
+      "avg_return_pct": 4.1571,
+      "total_return_pct": 24.9428,
+      "best_trade_pct": 5.2994,
+      "worst_trade_pct": 0.6607
+    },
+    {
+      "symbol": "XLV",
+      "trades": 8,
+      "net_pnl": -207.83,
+      "pnl_share_pct": -0.19,
+      "win_rate_pct": 62.5,
+      "avg_return_pct": -0.05,
+      "total_return_pct": -0.3998,
+      "best_trade_pct": 6.3501,
+      "worst_trade_pct": -8.0652
+    },
+    {
+      "symbol": "XOM",
+      "trades": 10,
+      "net_pnl": 1640.75,
+      "pnl_share_pct": 1.51,
+      "win_rate_pct": 60.0,
+      "avg_return_pct": 0.9713,
+      "total_return_pct": 9.7135,
+      "best_trade_pct": 8.961,
+      "worst_trade_pct": -8.0652
+    }
+  ],
+  "per_year": [
+    {
+      "label": "2006",
+      "days": 251,
+      "return_pct": 0.0,
+      "benchmark_return_pct": -2.6947,
+      "max_drawdown_pct": 0.0,
+      "trades": 0,
+      "sharpe": 0.0
+    },
+    {
+      "label": "2007",
+      "days": 253,
+      "return_pct": -0.1808,
+      "benchmark_return_pct": 6.7672,
+      "max_drawdown_pct": -1.7935,
+      "trades": 1,
+      "sharpe": -0.1124
+    },
+    {
+      "label": "2008",
+      "days": 254,
+      "return_pct": 0.1519,
+      "benchmark_return_pct": 47.7266,
+      "max_drawdown_pct": -1.6663,
+      "trades": 2,
+      "sharpe": 0.0756
+    },
+    {
+      "label": "2009",
+      "days": 253,
+      "return_pct": 3.2814,
+      "benchmark_return_pct": 19.4788,
+      "max_drawdown_pct": -1.1767,
+      "trades": 3,
+      "sharpe": 1.2532
+    },
+    {
+      "label": "2010",
+      "days": 253,
+      "return_pct": -3.1738,
+      "benchmark_return_pct": 20.8819,
+      "max_drawdown_pct": -4.3,
+      "trades": 5,
+      "sharpe": -0.9748
+    },
+    {
+      "label": "2011",
+      "days": 253,
+      "return_pct": 6.4488,
+      "benchmark_return_pct": 16.2253,
+      "max_drawdown_pct": -1.5677,
+      "trades": 10,
+      "sharpe": 1.8099
+    },
+    {
+      "label": "2012",
+      "days": 253,
+      "return_pct": -6.6766,
+      "benchmark_return_pct": 14.2113,
+      "max_drawdown_pct": -6.7354,
+      "trades": 6,
+      "sharpe": -1.9087
+    },
+    {
+      "label": "2013",
+      "days": 253,
+      "return_pct": 5.7392,
+      "benchmark_return_pct": 22.4477,
+      "max_drawdown_pct": -3.3364,
+      "trades": 16,
+      "sharpe": 1.088
+    },
+    {
+      "label": "2014",
+      "days": 253,
+      "return_pct": 0.0,
+      "benchmark_return_pct": -11.5552,
+      "max_drawdown_pct": 0.0,
+      "trades": 0,
+      "sharpe": 0.0
+    },
+    {
+      "label": "2015",
+      "days": 253,
+      "return_pct": -8.3096,
+      "benchmark_return_pct": 7.4679,
+      "max_drawdown_pct": -11.4463,
+      "trades": 13,
+      "sharpe": -1.6578
+    },
+    {
+      "label": "2016",
+      "days": 253,
+      "return_pct": 0.2984,
+      "benchmark_return_pct": 3.4201,
+      "max_drawdown_pct": -0.6953,
+      "trades": 0,
+      "sharpe": 0.4222
+    },
+    {
+      "label": "2017",
+      "days": 252,
+      "return_pct": 1.7551,
+      "benchmark_return_pct": 13.2095,
+      "max_drawdown_pct": -1.5263,
+      "trades": 7,
+      "sharpe": 0.7331
+    },
+    {
+      "label": "2018",
+      "days": 253,
+      "return_pct": 3.0344,
+      "benchmark_return_pct": 26.3181,
+      "max_drawdown_pct": -2.3841,
+      "trades": 6,
+      "sharpe": 1.0528
+    },
+    {
+      "label": "2019",
+      "days": 253,
+      "return_pct": 4.2943,
+      "benchmark_return_pct": 13.2289,
+      "max_drawdown_pct": -3.2673,
+      "trades": 4,
+      "sharpe": 0.8999
+    },
+    {
+      "label": "2020",
+      "days": 254,
+      "return_pct": 1.1972,
+      "benchmark_return_pct": 35.9366,
+      "max_drawdown_pct": -2.4307,
+      "trades": 2,
+      "sharpe": 0.4142
+    },
+    {
+      "label": "2021",
+      "days": 253,
+      "return_pct": 6.4994,
+      "benchmark_return_pct": -0.5387,
+      "max_drawdown_pct": -4.6654,
+      "trades": 13,
+      "sharpe": 1.0958
+    },
+    {
+      "label": "2022",
+      "days": 252,
+      "return_pct": 0.6395,
+      "benchmark_return_pct": 26.3934,
+      "max_drawdown_pct": -0.175,
+      "trades": 1,
+      "sharpe": 1.2649
+    },
+    {
+      "label": "2023",
+      "days": 251,
+      "return_pct": -0.0366,
+      "benchmark_return_pct": -8.4101,
+      "max_drawdown_pct": -1.2638,
+      "trades": 3,
+      "sharpe": -0.018
+    },
+    {
+      "label": "2024",
+      "days": 253,
+      "return_pct": -0.0957,
+      "benchmark_return_pct": 2.9969,
+      "max_drawdown_pct": -4.7615,
+      "trades": 9,
+      "sharpe": -0.0049
+    },
+    {
+      "label": "2025",
+      "days": 252,
+      "return_pct": 1.2785,
+      "benchmark_return_pct": -27.6275,
+      "max_drawdown_pct": -0.6634,
+      "trades": 2,
+      "sharpe": 0.837
+    },
+    {
+      "label": "2026",
+      "days": 124,
+      "return_pct": 4.1676,
+      "benchmark_return_pct": 11.653,
+      "max_drawdown_pct": -1.8501,
+      "trades": 6,
+      "sharpe": 2.1612
+    }
+  ],
+  "per_regime": [
+    {
+      "regime": "crisis",
+      "days": 500,
+      "share_of_time_pct": 9.69,
+      "return_pct": 6.0462,
+      "benchmark_return_pct": -39.0827,
+      "hit_rate_pct": 7.8,
+      "trades": 8
+    },
+    {
+      "regime": "high_vol",
+      "days": 795,
+      "share_of_time_pct": 15.41,
+      "return_pct": 0.6882,
+      "benchmark_return_pct": 57.0998,
+      "hit_rate_pct": 9.56,
+      "trades": 16
+    },
+    {
+      "regime": "bull",
+      "days": 3018,
+      "share_of_time_pct": 58.51,
+      "return_pct": 6.8723,
+      "benchmark_return_pct": 397.46,
+      "hit_rate_pct": 10.93,
+      "trades": 76
+    },
+    {
+      "regime": "sideways",
+      "days": 845,
+      "share_of_time_pct": 16.38,
+      "return_pct": 5.753,
+      "benchmark_return_pct": 56.915,
+      "hit_rate_pct": 9.82,
+      "trades": 9
+    }
+  ],
+  "concentration": {
+    "top_symbol": "MSFT",
+    "top_symbol_pnl_share_pct": 21.0,
+    "top5_trades_pnl_share_pct": 23.15,
+    "top10_days_return_share_pct": 4.12,
+    "profitable_symbols": 11,
+    "total_symbols": 18,
+    "positive_years": 13,
+    "total_years": 21,
+    "detail": {
+      "symbol_pnl": {
+        "AAPL": -881.25,
+        "AMZN": -1241.99,
+        "DIA": 1218.9,
+        "GLD": 1322.69,
+        "IWM": -608.2,
+        "JNJ": -554.3,
+        "JPM": 4410.04,
+        "KO": 2670.07,
+        "MSFT": 6092.74,
+        "NVDA": -1650.78,
+        "QQQ": -3182.81,
+        "SPY": 2406.82,
+        "TLT": 500.52,
+        "XLE": 3108.08,
+        "XLF": 491.13,
+        "XLK": 5144.45,
+        "XLV": -207.83,
+        "XOM": 1640.75
+      }
+    }
+  },
+  "validation": {
+    "split": {
+      "split_date": "2020-05-04",
+      "train": {
+        "start": "2006-01-03",
+        "end": "2020-05-01",
+        "days": 3611,
+        "years": 14.3294,
+        "initial_equity": 100000.0,
+        "final_equity": 105131.826,
+        "total_return_pct": 5.1318,
+        "cagr_pct": 0.3499,
+        "volatility_pct": 3.1566,
+        "sharpe": 0.1265,
+        "sortino": 0.1765,
+        "max_drawdown_pct": -11.7388,
+        "max_drawdown_days": 1662,
+        "calmar": 0.0298,
+        "exposure_pct": 5.7815,
+        "trades": 73,
+        "win_rate_pct": 58.9041,
+        "profit_factor": 1.1649,
+        "avg_win_pct": 4.571,
+        "avg_loss_pct": -5.444,
+        "expectancy_pct": 0.4553,
+        "avg_holding_days": 14.2603,
+        "total_costs": 1794.6103,
+        "cost_drag_pct": 24.2622,
+        "best_day_pct": 2.3214,
+        "worst_day_pct": -2.2712
+      },
+      "test": {
+        "start": "2020-05-04",
+        "end": "2026-06-30",
+        "days": 1548,
+        "years": 6.1429,
+        "initial_equity": 105119.14,
+        "final_equity": 120679.0158,
+        "total_return_pct": 14.8021,
+        "cagr_pct": 2.2726,
+        "volatility_pct": 3.4021,
+        "sharpe": 0.6779,
+        "sortino": 1.0894,
+        "max_drawdown_pct": -4.7615,
+        "max_drawdown_days": 240,
+        "calmar": 0.4773,
+        "exposure_pct": 7.0096,
+        "trades": 36,
+        "win_rate_pct": 69.4444,
+        "profit_factor": 2.4875,
+        "avg_win_pct": 4.6265,
+        "avg_loss_pct": -4.2189,
+        "expectancy_pct": 1.9238,
+        "avg_holding_days": 15.2778,
+        "total_costs": 964.7186,
+        "cost_drag_pct": 6.0138,
+        "best_day_pct": 2.0501,
+        "worst_day_pct": -1.7189
+      },
+      "sharpe_retention": 5.3607,
+      "degradation_pct": -436.07,
+      "note": ""
+    },
+    "walk_forward": {
+      "folds": [
+        {
+          "index": 1,
+          "start": "2006-01-03",
+          "end": "2010-02-04",
+          "metrics": {
+            "start": "2006-01-03",
+            "end": "2010-02-04",
+            "days": 1031,
+            "years": 4.0913,
+            "initial_equity": 100000.0,
+            "final_equity": 103251.3131,
+            "total_return_pct": 3.2513,
+            "cagr_pct": 0.7851,
+            "volatility_pct": 1.8949,
+            "sharpe": 0.4226,
+            "sortino": 0.6947,
+            "max_drawdown_pct": -2.3514,
+            "max_drawdown_days": 283,
+            "calmar": 0.3339,
+            "exposure_pct": 1.9564,
+            "trades": 6,
+            "win_rate_pct": 66.6667,
+            "profit_factor": 2.7897,
+            "avg_win_pct": 6.3052,
+            "avg_loss_pct": -4.4852,
+            "expectancy_pct": 2.7084,
+            "avg_holding_days": 16.6667,
+            "total_costs": 146.8678,
+            "cost_drag_pct": 4.322,
+            "best_day_pct": 1.232,
+            "worst_day_pct": -0.9276
+          }
+        },
+        {
+          "index": 2,
+          "start": "2010-02-05",
+          "end": "2014-03-11",
+          "metrics": {
+            "start": "2010-02-05",
+            "end": "2014-03-11",
+            "days": 1032,
+            "years": 4.0952,
+            "initial_equity": 100000.0,
+            "final_equity": 101701.8198,
+            "total_return_pct": 1.7018,
+            "cagr_pct": 0.4129,
+            "volatility_pct": 3.9434,
+            "sharpe": 0.1243,
+            "sortino": 0.1741,
+            "max_drawdown_pct": -7.893,
+            "max_drawdown_days": 456,
+            "calmar": 0.0523,
+            "exposure_pct": 11.4871,
+            "trades": 37,
+            "win_rate_pct": 59.4595,
+            "profit_factor": 1.1147,
+            "avg_win_pct": 3.8273,
+            "avg_loss_pct": -4.8652,
+            "expectancy_pct": 0.3033,
+            "avg_holding_days": 16.1081,
+            "total_costs": 888.8259,
+            "cost_drag_pct": 34.3091,
+            "best_day_pct": 1.4089,
+            "worst_day_pct": -1.594
+          }
+        },
+        {
+          "index": 3,
+          "start": "2014-03-12",
+          "end": "2018-04-16",
+          "metrics": {
+            "start": "2014-03-12",
+            "end": "2018-04-16",
+            "days": 1032,
+            "years": 4.0952,
+            "initial_equity": 100000.0,
+            "final_equity": 96609.6681,
+            "total_return_pct": -3.3903,
+            "cagr_pct": -0.8387,
+            "volatility_pct": 3.1067,
+            "sharpe": -0.2558,
+            "sortino": -0.3145,
+            "max_drawdown_pct": -11.6385,
+            "max_drawdown_days": 726,
+            "calmar": -0.0721,
+            "exposure_pct": 5.7026,
+            "trades": 26,
+            "win_rate_pct": 57.6923,
+            "profit_factor": 0.7375,
+            "avg_win_pct": 3.3157,
+            "avg_loss_pct": -5.9309,
+            "expectancy_pct": -0.5963,
+            "avg_holding_days": 11.3462,
+            "total_costs": 600.8882,
+            "cost_drag_pct": 21.5415,
+            "best_day_pct": 1.1126,
+            "worst_day_pct": -2.2685
+          }
+        },
+        {
+          "index": 4,
+          "start": "2018-04-17",
+          "end": "2022-05-18",
+          "metrics": {
+            "start": "2018-04-17",
+            "end": "2022-05-18",
+            "days": 1032,
+            "years": 4.0952,
+            "initial_equity": 100000.0,
+            "final_equity": 112431.0372,
+            "total_return_pct": 12.431,
+            "cagr_pct": 2.9024,
+            "volatility_pct": 4.0408,
+            "sharpe": 0.7289,
+            "sortino": 1.1841,
+            "max_drawdown_pct": -4.6597,
+            "max_drawdown_days": 142,
+            "calmar": 0.6229,
+            "exposure_pct": 5.0559,
+            "trades": 19,
+            "win_rate_pct": 73.6842,
+            "profit_factor": 2.5033,
+            "avg_win_pct": 7.2729,
+            "avg_loss_pct": -8.0652,
+            "expectancy_pct": 3.2366,
+            "avg_holding_days": 13.6842,
+            "total_costs": 481.5145,
+            "cost_drag_pct": 3.729,
+            "best_day_pct": 2.32,
+            "worst_day_pct": -1.72
+          }
+        },
+        {
+          "index": 5,
+          "start": "2022-05-19",
+          "end": "2026-06-30",
+          "metrics": {
+            "start": "2022-05-19",
+            "end": "2026-06-30",
+            "days": 1032,
+            "years": 4.0952,
+            "initial_equity": 100000.0,
+            "final_equity": 105992.96,
+            "total_return_pct": 5.993,
+            "cagr_pct": 1.4314,
+            "volatility_pct": 2.5888,
+            "sharpe": 0.5625,
+            "sortino": 0.906,
+            "max_drawdown_pct": -4.76,
+            "max_drawdown_days": 240,
+            "calmar": 0.3007,
+            "exposure_pct": 6.193,
+            "trades": 21,
+            "win_rate_pct": 61.9048,
+            "profit_factor": 2.3563,
+            "avg_win_pct": 4.0152,
+            "avg_loss_pct": -2.7765,
+            "expectancy_pct": 1.4279,
+            "avg_holding_days": 15.3333,
+            "total_costs": 505.6546,
+            "cost_drag_pct": 7.781,
+            "best_day_pct": 1.5868,
+            "worst_day_pct": -1.3651
+          }
+        }
+      ],
+      "positive_folds": 4,
+      "total_folds": 5,
+      "median_sharpe": 0.4226,
+      "worst_fold_return_pct": -3.3903,
+      "note": ""
+    },
+    "cost_sensitivity": {
+      "points": [
+        {
+          "multiple": 0.0,
+          "round_trip_bps": 0.0,
+          "cagr_pct": 1.0467,
+          "sharpe": 0.3383,
+          "total_return_pct": 23.7599,
+          "trades": 109
+        },
+        {
+          "multiple": 1.0,
+          "round_trip_bps": 12.0,
+          "cagr_pct": 0.9224,
+          "sharpe": 0.3003,
+          "total_return_pct": 20.679,
+          "trades": 109
+        },
+        {
+          "multiple": 2.0,
+          "round_trip_bps": 24.0,
+          "cagr_pct": 0.803,
+          "sharpe": 0.2645,
+          "total_return_pct": 17.79,
+          "trades": 109
+        },
+        {
+          "multiple": 3.0,
+          "round_trip_bps": 36.0,
+          "cagr_pct": 0.6802,
+          "sharpe": 0.2267,
+          "total_return_pct": 14.8877,
+          "trades": 109
+        },
+        {
+          "multiple": 5.0,
+          "round_trip_bps": 60.0,
+          "cagr_pct": 0.4397,
+          "sharpe": 0.1521,
+          "total_return_pct": 9.3978,
+          "trades": 109
+        }
+      ],
+      "base_sharpe": 0.3003,
+      "sharpe_at_3x": 0.2267,
+      "sharpe_retained_at_3x": 0.7549,
+      "breakeven_round_trip_bps": null,
+      "survives_5x": true,
+      "note": "Still profitable at 5x the configured costs (60 bps round trip); no break-even found in range."
+    },
+    "parameter_robustness": {
+      "neighbours": [
+        {
+          "label": "RSI period",
+          "path": "entry[0].left.period",
+          "base_value": 14.0,
+          "value": 13,
+          "factor": 0.9,
+          "sharpe": 0.2116,
+          "cagr_pct": 0.7789,
+          "trades": 143
+        },
+        {
+          "label": "RSI period",
+          "path": "entry[0].left.period",
+          "base_value": 14.0,
+          "value": 15,
+          "factor": 1.1,
+          "sharpe": 0.2024,
+          "cagr_pct": 0.4962,
+          "trades": 72
+        },
+        {
+          "label": "entry rule 1 threshold",
+          "path": "entry[0].right.value",
+          "base_value": 30.0,
+          "value": 27.0,
+          "factor": 0.9,
+          "sharpe": 0.2528,
+          "cagr_pct": 0.516,
+          "trades": 42
+        },
+        {
+          "label": "entry rule 1 threshold",
+          "path": "entry[0].right.value",
+          "base_value": 30.0,
+          "value": 33.0,
+          "factor": 1.1,
+          "sharpe": 0.0729,
+          "cagr_pct": 0.2369,
+          "trades": 198
+        },
+        {
+          "label": "Simple moving average period",
+          "path": "entry[1].right.period",
+          "base_value": 200.0,
+          "value": 180,
+          "factor": 0.9,
+          "sharpe": 0.23,
+          "cagr_pct": 0.6174,
+          "trades": 94
+        },
+        {
+          "label": "Simple moving average period",
+          "path": "entry[1].right.period",
+          "base_value": 200.0,
+          "value": 220,
+          "factor": 1.1,
+          "sharpe": 0.2744,
+          "cagr_pct": 0.9385,
+          "trades": 120
+        },
+        {
+          "label": "RSI period",
+          "path": "exit[0].left.period",
+          "base_value": 14.0,
+          "value": 13,
+          "factor": 0.9,
+          "sharpe": 0.2888,
+          "cagr_pct": 0.878,
+          "trades": 109
+        },
+        {
+          "label": "RSI period",
+          "path": "exit[0].left.period",
+          "base_value": 14.0,
+          "value": 15,
+          "factor": 1.1,
+          "sharpe": 0.3252,
+          "cagr_pct": 1.0197,
+          "trades": 109
+        }
+      ],
+      "base_sharpe": 0.3003,
+      "median_sharpe": 0.2414,
+      "worst_sharpe": 0.0729,
+      "profitable_share_pct": 100.0,
+      "fragility_ratio": 1.244,
+      "parameters_probed": 4,
+      "parameters_total": 7,
+      "note": ""
+    }
+  },
+  "evidence": {
+    "score": 83.4,
+    "grade": "A",
+    "headline": "Grade A - 83/100. Weakest evidence: sample size (109 closed trades). This scores how much the backtest can be trusted, not how much money the strategy will make.",
+    "components": [
+      {
+        "key": "sample_size",
+        "label": "Sample size",
+        "weight": 20.0,
+        "score": 0.6476,
+        "points": 12.95,
+        "measurement": "109 closed trades",
+        "detail": "Log-scaled: zero at 10 trades or fewer, full marks at 400. Below ~30 trades almost any performance figure is within the range of luck."
+      },
+      {
+        "key": "oos_consistency",
+        "label": "Out-of-sample consistency",
+        "weight": 20.0,
+        "score": 0.666,
+        "points": 13.32,
+        "measurement": "out-of-sample Sharpe is 5.4x in-sample - the two halves behave differently; 4/5 walk-forward folds positive",
+        "detail": "Wild disagreement between the halves is scored as instability, not as strength: whichever half is unrepresentative, one of them is."
+      },
+      {
+        "key": "breadth",
+        "label": "Breadth across symbols",
+        "weight": 15.0,
+        "score": 1.0,
+        "points": 15.0,
+        "measurement": "11/18 symbols profitable; top symbol MSFT holds 21% of gross profit",
+        "detail": "Full marks when 60%+ of the universe is profitable and no symbol holds more than 25% of gross profit."
+      },
+      {
+        "key": "time_consistency",
+        "label": "Consistency over time",
+        "weight": 15.0,
+        "score": 0.8921,
+        "points": 13.38,
+        "measurement": "13/21 calendar years positive; 4/4 market regimes positive",
+        "detail": "Full marks at 70%+ of years positive and every regime positive. A strategy that only works in one regime is a bet on that regime."
+      },
+      {
+        "key": "cost_robustness",
+        "label": "Robustness to costs",
+        "weight": 15.0,
+        "score": 1.0,
+        "points": 15.0,
+        "measurement": "75% of Sharpe retained at 3x costs; still profitable at 5x",
+        "detail": "Sharpe at 3x the configured commission and slippage, divided by Sharpe at the configured level. Full marks at 80% retained."
+      },
+      {
+        "key": "parameter_robustness",
+        "label": "Parameter robustness",
+        "weight": 15.0,
+        "score": 0.9187,
+        "points": 13.78,
+        "measurement": "100% of 8 perturbed variants profitable; base/median Sharpe 1.24x",
+        "detail": "Each numeric parameter is moved +/-10% and +/-20%. Full marks when the neighbours stay profitable and perform like the base run."
+      }
+    ],
+    "warnings": [
+      {
+        "id": "synthetic_data",
+        "severity": "critical",
+        "title": "This snapshot is simulated, not real market data",
+        "message": "The bars are generated by a seeded regime-switching model so the demo runs offline and reproducibly. Structure is realistic, but no result here is a statement about real markets. Run `make data-real` to vendor an actual snapshot.",
+        "measurement": "synthetic snapshot",
+        "threshold": "always reported when data is generated"
+      },
+      {
+        "id": "underperforms_benchmark",
+        "severity": "high",
+        "title": "Buying and holding the benchmark beat this",
+        "message": "Whatever the risk-adjusted figures say, the simplest possible alternative made more money over the same window. That is the bar any active rule has to clear.",
+        "measurement": "0.92% CAGR vs 10.32% for buy-and-hold (9.40 pts behind)",
+        "threshold": "strategy CAGR below benchmark CAGR"
+      },
+      {
+        "id": "low_exposure",
+        "severity": "medium",
+        "title": "Capital sits idle almost all the time",
+        "message": "Risk-adjusted ratios flatter a strategy that is rarely invested, because flat days add no volatility. Compare the total return with the benchmark, not just the Sharpe.",
+        "measurement": "6.2% average exposure",
+        "threshold": "less than 10%"
+      },
+      {
+        "id": "position_cap_binding",
+        "severity": "medium",
+        "title": "The position cap threw away a lot of signals",
+        "message": "More entry signals fired than there were free slots, so the engine kept the alphabetically first symbols and dropped the rest. That tie-break is arbitrary: a different one would give a different result. Raise the position cap or tighten the entry rule.",
+        "measurement": "26 signals dropped against 109 trades taken",
+        "threshold": "more than 20% of trade count"
+      },
+      {
+        "id": "single_data_source",
+        "severity": "info",
+        "title": "One data source, one snapshot",
+        "message": "Results are not reconciled against a second vendor. Bad prints, adjustment errors and calendar quirks would pass through unnoticed.",
+        "measurement": "single frozen snapshot",
+        "threshold": "always reported"
+      },
+      {
+        "id": "universe_hindsight",
+        "severity": "info",
+        "title": "The universe was chosen with hindsight",
+        "message": "Every symbol here exists and is liquid today. A strategy tested only on survivors looks better than the same strategy run on the full historical cross-section, delistings included.",
+        "measurement": "fixed 18-symbol universe",
+        "threshold": "always reported"
+      }
+    ]
+  },
+  "diagnostics": {
+    "skipped_entry_signals": 26,
+    "warmup_bars": 200,
+    "universe_size": 18,
+    "bars_evaluated": 5159,
+    "backtests_run": 18
+  },
+  "result_hash": "d46f045f97cf5763",
+  "run_id": "d386b5494a72e15e",
+  "created_at": "2026-08-20T08:12:14+00:00",
+  "timings_ms": {
+    "backtest_ms": 138.9,
+    "validation_ms": 416.7,
+    "robustness_ms": 1714.6
+  },
+  "reproducibility": {
+    "deterministic": true,
+    "note": "Re-running this strategy against the same data snapshot reproduces result hash d46f045f97cf5763 exactly. The hash covers the strategy, the config, every metric and every trade.",
+    "canonical_strategy": "{\"dsl_version\":\"1.0.0\",\"entry\":{\"conditions\":[{\"left\":{\"fast\":null,\"k\":null,\"kind\":\"indicator\",\"name\":\"rsi\",\"period\":14,\"signal\":null,\"slow\":null},\"op\":\"<\",\"right\":{\"kind\":\"constant\",\"value\":30.0}},{\"left\":{\"fast\":null,\"k\":null,\"kind\":\"indicator\",\"name\":\"close\",\"period\":null,\"signal\":null,\"slow\":null},\"op\":\">\",\"right\":{\"fast\":null,\"k\":null,\"kind\":\"indicator\",\"name\":\"sma\",\"period\":200,\"signal\":null,\"slow\":null}}],\"logic\":\"all\"},\"exit\":{\"conditions\":[{\"left\":{\"fast\":null,\"k\":null,\"kind\":\"indicator\",\"name\":\"rsi\",\"period\":14,\"signal\":null,\"slow\":null},\"op\":\">\",\"right\":{\"kind\":\"constant\",\"value\":55.0}}],\"logic\":\"any\"},\"name\":\"RSI dip in an uptrend\",\"position\":{\"direction\":\"long\",\"max_positions\":5,\"max_positions_per_symbol\":1,\"sizing\":\"equal_weight\"},\"risk\":{\"max_holding_days\":20,\"stop_loss_pct\":8.0,\"take_profit_pct\":null,\"trailing_stop_pct\":null},\"source_text\":\"Buy when RSI(14) drops below 30 and price is above the 200-day moving average; sell when RSI goes above 55 or after 20 days. 8% stop loss.\",\"universe\":[\"AAPL\",\"AMZN\",\"DIA\",\"GLD\",\"IWM\",\"JNJ\",\"JPM\",\"KO\",\"MSFT\",\"NVDA\",\"QQQ\",\"SPY\",\"TLT\",\"XLE\",\"XLF\",\"XLK\",\"XLV\",\"XOM\"]}"
+  }
+}
